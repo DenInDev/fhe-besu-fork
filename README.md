@@ -1,18 +1,13 @@
 # BesuFHE
 
-BesuFHE e' un prototipo di ricerca per eseguire operazioni omomorfiche dentro
+BesuFHE è un prototipo di ricerca per eseguire operazioni omomorfiche dentro
 una chain EVM permissioned basata su Hyperledger Besu modificato. Il progetto
 usa una precompile nativa all'indirizzo `0x100`, collegata a un backend
 TFHE-rs, e mantiene i ciphertext completi nello stato on-chain.
 
-L'obiettivo non e' replicare l'architettura Zama fhEVM con coprocessor
-off-chain, ma testare un modello alternativo: i validatori Besu eseguono
-direttamente la logica FHE attraverso una precompile deterministica e il
-contratto applicativo salva solo ciphertext, hash e metadati.
+## Flusso di di Registrazione/Notarizzazione di Ciphertext
 
-## Flusso mantenuto
-
-Il repository ora mantiene un solo flusso principale:
+Il repository presenta come flusso di registrazione dei ciphertext:
 
 1. l'utente cifra localmente un valore energetico con `tfhe_tool`;
 2. viene prodotta una input validation proof ZK tramite Noir/Barretenberg;
@@ -24,14 +19,6 @@ Il repository ora mantiene un solo flusso principale:
 6. nel flusso principale di benchmark, `add`, `mulScalar`, `mean` e `max`
    salvano risultati proof-backed come nuovi ciphertext on-chain;
 7. il possessore della client key recupera e decifra localmente gli output.
-
-Non sono piu' presenti:
-
-- verifier di sviluppo basati su firme EIP-712;
-- proof pesanti basate su RISC Zero per ogni operazione;
-- script storici con modalita' miste;
-- cartelle `logs`, `docs`, `contracts/generated` versionate;
-- output di build Hardhat, Gradle, Rust o runtime committati.
 
 Gli output ricreabili vengono generati sotto directory ignorate da Git
 (`artifacts/`, `cache/`, `typechain-types/`, `runtime/`, `proof/noir/**/target/`).
@@ -71,13 +58,12 @@ File principali:
 - `scripts/interact/energy-notary-benchmark.ts`: workflow end-to-end pulito.
 
 ## Requisiti
-
-- Windows con WSL2.
+- Windows con WSL2 o Distro Linux.
 - Node.js `20.x` e npm `10+`.
 - Rust/Cargo in WSL.
 - Java compatibile con la build Besu.
 - `nargo` e `bb` per produrre/verificare le proof Noir.
-- rete BesuFHE locale inclusa in `besu/network`.
+- Rete BesuFHE locale inclusa in `besu/network`.
 
 Installazione dipendenze Node:
 
@@ -87,7 +73,7 @@ npm install
 
 ## Build
 
-Compila il backend nativo TFHE-rs:
+Per compilare il backend nativo TFHE-rs:
 
 ```bash
 npm run build:native
@@ -100,7 +86,7 @@ runtime/native/libbesu_fhe_native.so
 runtime/native/tfhe_tool
 ```
 
-Compila il fork Besu:
+Per compilare il fork Besu:
 
 ```bash
 npm run build:besu
@@ -112,7 +98,7 @@ Output ricreato:
 runtime/besu/
 ```
 
-Compila i contratti:
+Per compilare i contratti:
 
 ```bash
 npm run compile
@@ -120,14 +106,15 @@ npm run compile
 
 ## Proof ZK di input
 
-Il circuito Noir e' intenzionalmente piccolo. Prova che:
+Il circuito Noir è intenzionalmente piccolo. Prova che:
 
 ```text
 plaintext in [minValue, maxValue]
 metadataHash = Poseidon(plaintext, salt, owner, ciphertextHashHi, ciphertextHashLo)
 ```
 
-Il contratto non vede il plaintext. On-chain vengono verificati:
+Per garantire la confidenzialità, il contratto non vede il plaintext. 
+On-chain vengono verificati:
 
 - proof Barretenberg/Noir;
 - public input del circuito;
@@ -153,11 +140,11 @@ Deploy dell'adapter, se il verifier generato e' gia' noto:
 FHEBC_NOIR_INPUT_VERIFIER_ADDRESS=0x... npm run deploy:besu:input-adapter
 ```
 
-## Operation proof leggere
+## Operation ZK-Proof leggere
 
-La verifica completa della semantica TFHE dentro una prova ZK e' possibile in
-linea teorica, ma troppo costosa per il flusso principale. Per questo il main
-case usa una operation proof ZK Noir leggera, legata al digest canonico
+La verifica completa della semantica TFHE dentro una prova ZK è possibile in
+linea teorica (vedere RISC-0, https://risczero.com/), ma troppo costosa per un setup scalabile. 
+Per questo il main case usa una operation proof ZK Noir leggera, legata al digest canonico
 dell'operazione:
 
 ```text
@@ -165,26 +152,28 @@ digest = H(chainId, notary, owner, operation, inputSetHash,
            resultCiphertextHash, resultMetadataHash, nonce)
 ```
 
-Il circuito prova conoscenza di un segreto del coprocessore associato a una
+Il circuito prova conoscenza di un segreto di un nodo trusted associato a una
 commitment pubblica autorizzata:
 
 ```text
 authorityCommitment = Poseidon(secret)
 attestationHash    = Poseidon(secret, digestHi, digestLo)
 ```
+Questo passaggio, purtroppo, richiede che il segreto sia associato a un nodo o un'autorità trusted.
+In futuro, si esploreranno metodi più trasparenti e efficienti per la generazione di proof complete di computazione.
 
 Il contratto verifica la proof tramite `NoirOperationProofVerifierAdapter`, senza
 vedere il secret del coprocessore. Questa resta una prova ZK di autorizzazione e
-binding al digest, non una prova ZK completa della semantica TFHE. Quindi:
-
+binding al digest, non una prova ZK completa della semantica TFHE. 
+Quindi:
 - correttezza del binding, non-riuso e disponibilita' sono gestite on-chain;
-- l'autorizzazione del coprocessore puo' essere verificata in zero knowledge;
+- l'autorizzazione di un'autorità può essere verificata in zero knowledge;
 - la correttezza matematica del calcolo TFHE dipende ancora dal coprocessore,
   a meno di introdurre una proof molto piu' pesante della semantica TFHE.
 
 ## Deploy
 
-Deploy del contratto benchmark su Besu:
+Deploy del contratto sperimentale su Besu:
 
 ```bash
 npm run deploy:besu
@@ -212,7 +201,7 @@ FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT=0x... \
 npm run deploy:besu
 ```
 
-La proof per una specifica operazione puo' essere prodotta con:
+La proof per una specifica operazione può essere prodotta con:
 
 ```bash
 FHEBC_OPERATION_ZK_SECRET=12345 \
@@ -252,7 +241,7 @@ Lo script di start usa il binario generato in `runtime/besu`, la libreria nativa
 in `runtime/native`, la server key in `runtime/keys/server.key` e la rete
 locale contenuta in `besu/network`.
 
-## Interazione end-to-end
+## Interazione End-to-End dell'Architettura
 
 Esecuzione del workflow completo:
 
@@ -261,7 +250,6 @@ npm run interact:besu
 ```
 
 Lo script:
-
 1. controlla che la precompile `0x100` risponda;
 2. genera le chiavi TFHE se non esistono;
 3. cifra un valore iniziale e una entry energetica;
@@ -288,11 +276,9 @@ FHEBC_ZK_PROOF_COMMAND="node scripts/proof/prove-energy-input-noir.js"
 FHEBC_OPERATION_ZK_SECRET=12345
 ```
 
-## Contratto benchmark
+## Contratto per Caso d'Uso (Energy Context)
 
-`EnergyDataNotaryOnChain` mantiene una superficie minimale, allineata ai
-benchmark Zama/Fhenix:
-
+`EnergyDataNotaryOnChain` prevede come operazioni:
 - `initializeEncryptedTotal(...)`;
 - `addEnergyEntry(...)`;
 - `getEntryCount()`;
@@ -318,20 +304,19 @@ cifrato on-chain. Nel flusso consigliato per benchmark e rete multi-validator si
 usano le versioni `*Proof`, cosi' i validatori verificano una attestazione
 leggera e non devono rieseguire operazioni FHE non lineari nella transazione.
 
-## Storage ciphertext
+## Storage Ciphertext
 
-I ciphertext non sono sostituiti da handle. Vengono salvati interamente on-chain:
-
+I ciphertext vengono salvati interamente on-chain:
 1. il payload viene spezzato in chunk;
 2. ogni chunk viene deployato come bytecode immutabile;
 3. un manifest conserva ordine e indirizzi;
 4. il notary conserva manifest, lunghezza, numero di chunk e content hash;
 5. letture e precompile ricostruiscono i bytes con `EXTCODECOPY`.
 
-Questa scelta rende la disponibilita' del ciphertext una proprieta' dello stato
-della chain, al prezzo di costi on-chain piu' alti.
+Questa scelta rende la disponibilità del ciphertext una proprietà dello stato
+della chain, al prezzo di costi on-chain più alti (ma gestibili per una chain permissioned).
 
-## Verifica locale
+## Verifica Locale
 
 ```bash
 npm run compile
@@ -339,7 +324,7 @@ npm run typecheck
 npm test
 ```
 
-Smoke test della precompile con Besu gia' avviato:
+Sanity Test della Precompile con Besu già avviato:
 
 ```bash
 npm run smoke:besu:precompile
