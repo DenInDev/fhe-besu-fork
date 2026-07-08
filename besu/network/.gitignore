@@ -1,0 +1,10 @@
+logs/
+.besu-pids
+Node-*/data/database/
+Node-*/data/caches/
+Node-*/data/fastsync/
+Node-*/data/uploads/
+Node-*/data/besu.networks
+Node-*/data/besu.ports
+Node-*/data/DATABASE_METADATA.json
+Node-*/data/VERSION_METADATA.json

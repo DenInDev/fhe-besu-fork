@@ -1,0 +1,40 @@
+=http://172.23.84.242:8545 : Termine '=http://172.23.84.242:8545' non riconosciuto come nome di cmdlet, funzione, 
+programma eseguibile o file script. Controllare l'ortografia del nome o verificare che il percorso sia incluso e 
+corretto, quindi riprovare.
+In riga:1 car:1
++ ='http://172.23.84.242:8545'; ='1'; ='C:\Users\danie\Desktop\FHEVM_Ch ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=http://172.23.84.242:8545:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=1 : Termine '=1' non riconosciuto come nome di cmdlet, funzione, programma eseguibile o file script. Controllare 
+l'ortografia del nome o verificare che il percorso sia incluso e corretto, quindi riprovare.
+In riga:1 car:31
++ ='http://172.23.84.242:8545'; ='1'; ='C:\Users\danie\Desktop\FHEVM_Ch ...
++                               ~~~~
+    + CategoryInfo          : ObjectNotFound: (=1:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-smoke-monitor : Termine 
+'=C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-smoke-monitor' non riconosciuto 
+come nome di cmdlet, funzione, programma eseguibile o file script. Controllare l'ortografia del nome o verificare che 
+il percorso sia incluso e corretto, quindi riprovare.
+In riga:1 car:37
++ ... 545'; ='1'; ='C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFH ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=C:\Users\danie...e-smoke-monitor:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+HardhatError: HH108: Cannot connect to the network fhebcBesu.
+Please make sure your node is running, and check your internet connection and networks config
+    at HttpProvider._fetchJsonRpcResponse (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\node_modules\hardhat\src\internal\core\providers\http.ts:249:15)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async HttpProvider.request (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\node_modules\hardhat\src\internal\core\providers\http.ts:104:29)
+    at async ChainIdValidatorProvider._getChainIdFromEthNetVersion (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\node_modules\hardhat\src\internal\core\providers\chainId.ts:33:17)
+    at async ChainIdValidatorProvider._getChainId (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\node_modules\hardhat\src\internal\core\providers\chainId.ts:17:25)
+    at async ChainIdValidatorProvider.request (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\node_modules\hardhat\src\internal\core\providers\chainId.ts:56:29)
+    at async getSigners (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\node_modules\@nomicfoundation\hardhat-ethers\src\internal\helpers.ts:46:16)
+    at async main (C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\scripts\interact\energy-notary-benchmark-10x.ts:285:19)
+
+    Caused by: Error: connect ECONNREFUSED 127.0.0.1:8545
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)

@@ -1,0 +1,4 @@
+
+> fhebc-besu-fhe@0.1.0 benchmark:besu
+> hardhat run scripts/interact/energy-notary-benchmark-10x.ts --network fhebcBesu
+

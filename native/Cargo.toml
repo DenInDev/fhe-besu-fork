@@ -1,0 +1,11 @@
+[package]
+name = "besu-fhe-native"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jni = "0.21"
+tfhe = { version = "1.6.2", features = ["integer", "software-prng"] }

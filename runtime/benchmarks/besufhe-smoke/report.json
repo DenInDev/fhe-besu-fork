@@ -1,0 +1,143 @@
+{
+  "generatedAt": "2026-07-08T00:41:12.195Z",
+  "mode": "mock-input-proof",
+  "network": {
+    "name": "fhebcBesu",
+    "chainId": "1337"
+  },
+  "owner": "0xa5e1defb98EFe38EBb2D958CEe052410247F4c80",
+  "contracts": {
+    "notary": "0x4e142887e3Dc6e414a9b260a1034D20C9B4Eb11F",
+    "adapter": "0x74c085A069fafD4f264B5200847EdB1ade82B3C0",
+    "mockVerifier": "0x8Fdb26641d14a80FCCBE87BF455338Dd9C539a50"
+  },
+  "settings": {
+    "runs": 1,
+    "scalar": "3",
+    "gasPriceWei": "1000",
+    "txGasLimit": "30000000",
+    "decryptTarget": "max_view"
+  },
+  "samples": [
+    {
+      "operation": "notarize",
+      "kind": "tx",
+      "gasUsed": 989274,
+      "latencyMs": 553
+    },
+    {
+      "operation": "add_view",
+      "kind": "view",
+      "gasUsed": 0,
+      "latencyMs": 268
+    },
+    {
+      "operation": "add",
+      "kind": "tx",
+      "gasUsed": 7023622,
+      "latencyMs": 1572
+    },
+    {
+      "operation": "mul_scalar",
+      "kind": "tx",
+      "gasUsed": 8927868,
+      "latencyMs": 30876
+    },
+    {
+      "operation": "mean_view",
+      "kind": "view",
+      "gasUsed": 0,
+      "latencyMs": 602
+    },
+    {
+      "operation": "mean",
+      "kind": "tx",
+      "gasUsed": 13004755,
+      "latencyMs": 3186
+    },
+    {
+      "operation": "max_view",
+      "kind": "view",
+      "gasUsed": 0,
+      "latencyMs": 611
+    },
+    {
+      "operation": "max",
+      "kind": "tx",
+      "gasUsed": 25004304,
+      "latencyMs": 31441
+    },
+    {
+      "operation": "decrypt",
+      "kind": "decrypt",
+      "gasUsed": 0,
+      "latencyMs": 3713,
+      "clearValue": 68
+    }
+  ],
+  "summary": [
+    {
+      "operation": "notarize",
+      "n": 1,
+      "meanGas": 989274,
+      "meanLatency": 553,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "decrypt",
+      "n": 1,
+      "meanGas": 0,
+      "meanLatency": 3713,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "add_view",
+      "n": 1,
+      "meanGas": 0,
+      "meanLatency": 268,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "add",
+      "n": 1,
+      "meanGas": 7023622,
+      "meanLatency": 1572,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "mul_scalar",
+      "n": 1,
+      "meanGas": 8927868,
+      "meanLatency": 30876,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "mean_view",
+      "n": 1,
+      "meanGas": 0,
+      "meanLatency": 602,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "mean",
+      "n": 1,
+      "meanGas": 13004755,
+      "meanLatency": 3186,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "max_view",
+      "n": 1,
+      "meanGas": 0,
+      "meanLatency": 611,
+      "latencyStdPct": 0
+    },
+    {
+      "operation": "max",
+      "n": 1,
+      "meanGas": 25004304,
+      "meanLatency": 31441,
+      "latencyStdPct": 0
+    }
+  ]
+}

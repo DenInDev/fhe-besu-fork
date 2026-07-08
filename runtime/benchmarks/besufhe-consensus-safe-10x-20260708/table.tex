@@ -1,0 +1,21 @@
+\begin{table}[H]
+\centering
+\caption{Benchmark BesuFHE su chain Besu locale}
+\label{tab:besufhe-local-benchmark}
+\begin{tabular}{lrrrr}
+\hline
+\textbf{Operazione} & \textbf{n} & \textbf{Gas medio} & \textbf{Latenza media (ms)} & \textbf{Dev. std latenza (\%)} \\
+\hline
+notarize & 10 & 989.255 & 1057 & 1,01 \\
+decrypt & 10 & 0 & 2940 & 5,03 \\
+add\_view & 10 & 0 & 201 & 4,81 \\
+add & 10 & 7.023.622 & 4440 & 199,98 \\
+mul\_scalar & 10 & 8.927.868 & 10.073 & 265,38 \\
+\hline
+\end{tabular}
+\end{table}
+\vspace{4pt}
+
+% Modalita': mock-input-proof-consensus-safe. Gas price rilevato: 1000 wei.
+% Nota: input proof verifier mocked; il costo del verifier Noir reale non e' incluso.
+% Nota consensus-safe: mean e max escluse per receipts root mismatch sulla rete Besu a 4 validatori.

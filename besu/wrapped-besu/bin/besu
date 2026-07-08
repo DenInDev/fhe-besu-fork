@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FORK_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_DIR="$(cd "$FORK_DIR/.." && pwd)"
+RUNTIME_DIR="$PROJECT_DIR/runtime"
+REAL_BESU="$RUNTIME_DIR/besu/bin/besu"
+POA_TX_SELECTION_MAX_TIME="${FHEBC_BESU_POA_BLOCK_TXS_SELECTION_MAX_TIME:-5000}"
+
+export FHEBC_TFHE_SERVER_KEY_PATH="${FHEBC_TFHE_SERVER_KEY_PATH:-$RUNTIME_DIR/keys/server.key}"
+export LD_LIBRARY_PATH="$RUNTIME_DIR/native${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export RAYON_NUM_THREADS="${RAYON_NUM_THREADS:-1}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+
+ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --p2p-port=*)
+      export FHEBC_P2P_PORT_OVERRIDE="${arg#*=}"
+      ARGS+=("$arg")
+      ;;
+    --poa-block-txs-selection-max-time=*)
+      ;;
+    *)
+      ARGS+=("$arg")
+      ;;
+  esac
+done
+
+exec "$REAL_BESU" \
+  --version-compatibility-protection=false \
+  "${ARGS[@]}" \
+  "--poa-block-txs-selection-max-time=$POA_TX_SELECTION_MAX_TIME"

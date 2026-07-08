@@ -1,0 +1,375 @@
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheCodec.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheCodec.java
+new file mode 100644
+index 0000000..f6dd94d
+--- /dev/null
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheCodec.java
+@@ -0,0 +1,103 @@
++/*
++ * Copyright Hyperledger Besu Contributors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
++ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++package org.hyperledger.besu.evm.precompile;
++
++import java.io.ByteArrayOutputStream;
++import java.util.ArrayList;
++import java.util.List;
++
++public final class FheCodec {
++  private FheCodec() {}
++
++  public static FheRequest decodeRequest(final byte[] input) {
++    if (input.length < 6 || input.length > FheConstants.MAX_REQUEST_BYTES) {
++      throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);
++    }
++
++    final int version = u8(input, 0);
++    final int operation = u8(input, 1);
++    final int inputType = u8(input, 2);
++    final int parameterSet = u16(input, 3);
++    final int operandCount = u8(input, 5);
++
++    if (version != FheConstants.VERSION || operandCount > FheConstants.MAX_OPERAND_COUNT) {
++      throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);
++    }
++
++    int offset = 6;
++    final List<byte[]> operands = new ArrayList<>(operandCount);
++    for (int i = 0; i < operandCount; i++) {
++      require(input, offset, 4);
++      final long operandLength = u32(input, offset);
++      offset += 4;
++      if (operandLength > FheConstants.MAX_CIPHERTEXT_BYTES) {
++        throw new FhePrecompileException(FheConstants.STATUS_INPUT_TOO_LARGE);
++      }
++      require(input, offset, (int) operandLength);
++      final byte[] operand = new byte[(int) operandLength];
++      System.arraycopy(input, offset, operand, 0, (int) operandLength);
++      operands.add(operand);
++      offset += (int) operandLength;
++    }
++
++    if (offset != input.length) {
++      throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);
++    }
++
++    return new FheRequest(version, operation, inputType, parameterSet, List.copyOf(operands));
++  }
++
++  public static byte[] encodeError(final int status) {
++    final ByteArrayOutputStream out = new ByteArrayOutputStream(8);
++    out.write(status & 0xff);
++    out.write(0);
++    writeU16(out, 0);
++    writeU32(out, 0);
++    return out.toByteArray();
++  }
++
++  private static void require(final byte[] input, final int offset, final int length) {
++    if (offset < 0 || length < 0 || offset + length > input.length) {
++      throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);
++    }
++  }
++
++  private static int u8(final byte[] input, final int offset) {
++    return input[offset] & 0xff;
++  }
++
++  private static int u16(final byte[] input, final int offset) {
++    return ((input[offset] & 0xff) << 8) | (input[offset + 1] & 0xff);
++  }
++
++  private static long u32(final byte[] input, final int offset) {
++    return ((long) (input[offset] & 0xff) << 24)
++        | ((long) (input[offset + 1] & 0xff) << 16)
++        | ((long) (input[offset + 2] & 0xff) << 8)
++        | (long) (input[offset + 3] & 0xff);
++  }
++
++  private static void writeU16(final ByteArrayOutputStream out, final int value) {
++    out.write((value >>> 8) & 0xff);
++    out.write(value & 0xff);
++  }
++
++  private static void writeU32(final ByteArrayOutputStream out, final int value) {
++    out.write((value >>> 24) & 0xff);
++    out.write((value >>> 16) & 0xff);
++    out.write((value >>> 8) & 0xff);
++    out.write(value & 0xff);
++  }
++}
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheConstants.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheConstants.java
+new file mode 100644
+index 0000000..ddd48bb
+--- /dev/null
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheConstants.java
+@@ -0,0 +1,52 @@
++/*
++ * Copyright Hyperledger Besu Contributors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
++ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++package org.hyperledger.besu.evm.precompile;
++
++public final class FheConstants {
++  public static final String PRECOMPILE_ADDRESS =
++      "0x0000000000000000000000000000000000000100";
++
++  public static final int VERSION = 1;
++
++  public static final int STATUS_OK = 0x00;
++  public static final int STATUS_INVALID_ENCODING = 0x01;
++  public static final int STATUS_INVALID_CIPHERTEXT = 0x02;
++  public static final int STATUS_PARAMETER_SET_MISMATCH = 0x03;
++  public static final int STATUS_UNSUPPORTED_OPERATION = 0x04;
++  public static final int STATUS_INPUT_TOO_LARGE = 0x05;
++  public static final int STATUS_INTERNAL_ERROR = 0x06;
++
++  public static final int OP_ADD = 0x01;
++  public static final int OP_SUB = 0x02;
++  public static final int OP_MUL_SCALAR = 0x03;
++  public static final int OP_EQ = 0x04;
++  public static final int OP_LT = 0x05;
++  public static final int OP_SELECT = 0x06;
++  public static final int OP_MEAN = 0x07;
++  public static final int OP_MAX = 0x08;
++
++  public static final int TYPE_EBOOL = 0x01;
++  public static final int TYPE_EUINT8 = 0x02;
++  public static final int TYPE_EUINT16 = 0x03;
++  public static final int TYPE_EUINT32 = 0x04;
++
++  public static final int PARAM_TFHE_UINT32_V1 = 0x0001;
++
++  public static final int MAX_OPERAND_COUNT = 64;
++  public static final int MAX_CIPHERTEXT_BYTES = 16 * 1024 * 1024;
++  public static final int MAX_REQUEST_BYTES = 128 * 1024 * 1024;
++
++  private FheConstants() {}
++}
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheDispatcherPrecompiledContract.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheDispatcherPrecompiledContract.java
+new file mode 100644
+index 0000000..4a761c7
+--- /dev/null
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheDispatcherPrecompiledContract.java
+@@ -0,0 +1,98 @@
++/*
++ * Copyright Hyperledger Besu Contributors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
++ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++package org.hyperledger.besu.evm.precompile;
++
++import org.hyperledger.besu.evm.frame.MessageFrame;
++import org.hyperledger.besu.evm.gascalculator.GasCalculator;
++
++import javax.annotation.Nonnull;
++
++import org.apache.tuweni.bytes.Bytes;
++
++/** Native TFHE-rs dispatcher precompile for local FHEBC Besu experiments. */
++public final class FheDispatcherPrecompiledContract extends AbstractPrecompiledContract {
++
++  public FheDispatcherPrecompiledContract(final GasCalculator gasCalculator) {
++    super("FHEBC_TFHE_DISPATCHER", gasCalculator);
++  }
++
++  @Override
++  public long gasRequirement(final Bytes input) {
++    try {
++      final FheRequest request = FheCodec.decodeRequest(input.toArrayUnsafe());
++      return switch (request.operation()) {
++        case FheConstants.OP_ADD -> 4_000_000L;
++        case FheConstants.OP_SUB -> 4_000_000L;
++        case FheConstants.OP_MUL_SCALAR -> 6_000_000L;
++        case FheConstants.OP_EQ -> 12_000_000L;
++        case FheConstants.OP_LT -> 18_000_000L;
++        case FheConstants.OP_SELECT -> 12_000_000L;
++        case FheConstants.OP_MEAN -> 6_000_000L + 2_000_000L * request.operands().size();
++        case FheConstants.OP_MAX -> 14_000_000L + 4_000_000L * request.operands().size();
++        default -> 1_000_000L;
++      };
++    } catch (RuntimeException ignored) {
++      return 1_000_000L;
++    }
++  }
++
++  @Nonnull
++  @Override
++  public PrecompileContractResult computePrecompile(
++      final Bytes input, @Nonnull final MessageFrame messageFrame) {
++    try {
++      final byte[] canonicalRequest = input.toArrayUnsafe();
++      final FheRequest request = FheCodec.decodeRequest(canonicalRequest);
++      validateRequest(request);
++      return PrecompileContractResult.success(Bytes.wrap(TfheNative.dispatch(canonicalRequest)));
++    } catch (final FhePrecompileException exception) {
++      return PrecompileContractResult.success(Bytes.wrap(FheCodec.encodeError(exception.status())));
++    } catch (final Throwable throwable) {
++      return PrecompileContractResult.success(
++          Bytes.wrap(FheCodec.encodeError(FheConstants.STATUS_INTERNAL_ERROR)));
++    }
++  }
++
++  private static void validateRequest(final FheRequest request) {
++    if (request.parameterSet() != FheConstants.PARAM_TFHE_UINT32_V1) {
++      throw new FhePrecompileException(FheConstants.STATUS_PARAMETER_SET_MISMATCH);
++    }
++    if (request.inputType() != FheConstants.TYPE_EUINT32) {
++      throw new FhePrecompileException(FheConstants.STATUS_UNSUPPORTED_OPERATION);
++    }
++
++    final int operandCount = request.operands().size();
++    switch (request.operation()) {
++      case FheConstants.OP_ADD,
++          FheConstants.OP_SUB,
++          FheConstants.OP_EQ,
++          FheConstants.OP_LT -> requireOperandCount(operandCount, 2);
++      case FheConstants.OP_MUL_SCALAR -> requireOperandCount(operandCount, 2);
++      case FheConstants.OP_SELECT -> requireOperandCount(operandCount, 3);
++      case FheConstants.OP_MEAN, FheConstants.OP_MAX -> {
++        if (operandCount == 0) {
++          throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);
++        }
++      }
++      default -> throw new FhePrecompileException(FheConstants.STATUS_UNSUPPORTED_OPERATION);
++    }
++  }
++
++  private static void requireOperandCount(final int actual, final int expected) {
++    if (actual != expected) {
++      throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);
++    }
++  }
++}
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/FhePrecompileException.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FhePrecompileException.java
+new file mode 100644
+index 0000000..da433ba
+--- /dev/null
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FhePrecompileException.java
+@@ -0,0 +1,27 @@
++/*
++ * Copyright Hyperledger Besu Contributors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
++ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++package org.hyperledger.besu.evm.precompile;
++
++public final class FhePrecompileException extends RuntimeException {
++  private final int status;
++
++  public FhePrecompileException(final int status) {
++    this.status = status;
++  }
++
++  public int status() {
++    return status;
++  }
++}
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheRequest.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheRequest.java
+new file mode 100644
+index 0000000..665e7cd
+--- /dev/null
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/FheRequest.java
+@@ -0,0 +1,20 @@
++/*
++ * Copyright Hyperledger Besu Contributors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
++ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++package org.hyperledger.besu.evm.precompile;
++
++import java.util.List;
++
++public record FheRequest(
++    int version, int operation, int inputType, int parameterSet, List<byte[]> operands) {}
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/MainnetPrecompiledContracts.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/MainnetPrecompiledContracts.java
+index 3f9f567..73433de 100644
+--- a/evm/src/main/java/org/hyperledger/besu/evm/precompile/MainnetPrecompiledContracts.java
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/MainnetPrecompiledContracts.java
+@@ -138,6 +138,9 @@ public interface MainnetPrecompiledContracts {
+     // EIP-4844 - shard blob transactions
+     // TODO: allow override to be configured?
+     registry.put(Address.KZG_POINT_EVAL, new KZGPointEvalPrecompiledContract());
++    registry.put(
++        Address.fromHexString(FheConstants.PRECOMPILE_ADDRESS),
++        new FheDispatcherPrecompiledContract(gasCalculator));
+   }
+ 
+   /**
+diff --git a/evm/src/main/java/org/hyperledger/besu/evm/precompile/TfheNative.java b/evm/src/main/java/org/hyperledger/besu/evm/precompile/TfheNative.java
+new file mode 100644
+index 0000000..ecea22d
+--- /dev/null
++++ b/evm/src/main/java/org/hyperledger/besu/evm/precompile/TfheNative.java
+@@ -0,0 +1,25 @@
++/*
++ * Copyright Hyperledger Besu Contributors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
++ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++package org.hyperledger.besu.evm.precompile;
++
++public final class TfheNative {
++  static {
++    System.loadLibrary("besu_fhe_native");
++  }
++
++  public static native byte[] dispatch(final byte[] canonicalRequest);
++
++  private TfheNative() {}
++}

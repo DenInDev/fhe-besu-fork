@@ -1,0 +1,41 @@
+{
+  "name": "fhebc-besu-fhe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BesuFHE: modified Besu with native TFHE-rs execution, on-chain ciphertexts, and lightweight input proofs.",
+  "engines": {
+    "node": ">=20 <21",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "typecheck": "tsc --noEmit",
+    "build:native": "bash native/scripts/build.sh",
+    "build:besu": "bash besu/scripts/build-fork.sh",
+    "configure:besu": "node scripts/local-besu-network.js configure",
+    "start:besu": "node scripts/local-besu-network.js start",
+    "stop:besu": "node scripts/local-besu-network.js stop",
+    "reset:besu": "node scripts/local-besu-network.js reset",
+    "status:besu": "node scripts/local-besu-network.js status",
+    "deploy:besu": "hardhat run scripts/deploy/deploy-light-input-stack.ts --network fhebcBesu",
+    "deploy:besu:input-adapter": "hardhat run scripts/deploy/deploy-noir-input-proof-adapter.ts --network fhebcBesu",
+    "deploy:besu:noir-input-verifier": "hardhat run scripts/deploy/deploy-noir-input-generated-verifier.ts --network fhebcBesu",
+    "deploy:besu:operation-adapter": "hardhat run scripts/deploy/deploy-noir-operation-proof-adapter.ts --network fhebcBesu",
+    "proof:build:energy-input": "node scripts/proof/build-energy-input-noir.js",
+    "proof:prove:energy-input": "node scripts/proof/prove-energy-input-noir.js",
+    "proof:build:operation-authority": "node scripts/proof/build-operation-authority-noir.js",
+    "proof:prove:operation-authority": "node scripts/proof/prove-operation-authority-noir.js",
+    "interact:besu": "hardhat run scripts/interact/energy-notary-benchmark.ts --network fhebcBesu",
+    "benchmark:besu": "hardhat run scripts/interact/energy-notary-benchmark-10x.ts --network fhebcBesu",
+    "smoke:besu:precompile": "python native/scripts/call_besu_precompile_add.py"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "ethers": "^6.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.0.0"
+  }
+}

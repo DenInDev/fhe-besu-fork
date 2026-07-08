@@ -1,0 +1,144 @@
+
+> fhebc-besu-fhe@0.1.0 benchmark:besu
+> hardhat run scripts/interact/energy-notary-benchmark-10x.ts --network fhebcBesu
+
+==========================================================================================
+BesuFHE EnergyDataNotary 10x benchmark
+==========================================================================================
+Network       : fhebcBesu (chainId 1337)
+Owner         : 0xa5e1defb98EFe38EBb2D958CEe052410247F4c80
+Notary        : 0x9E983841aeC80A8d899d7304B600b0a7365516Ea
+Input proof   : mock-input-proof
+Operation proof: 0x535b28eEdb7e55B66c1c6F75BF4D1EbE4e3D9507 (mock)
+Benchmark mode: native linear + proof-backed aggregates
+Runs          : 10
+Gas price     : 1000 wei
+Output dir    : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-benchmark-20260708-180915
+==========================================================================================
+
+Warmup...
+Warmup done.
+
+--- run 1/10 value=40 ---
+notarize       tx      gas=     989.296 latency=1039 ms
+add_view       view    gas=      (view) latency=464 ms
+add            tx      gas=   7.023.897 latency=2063 ms
+mul_scalar     tx      gas=   8.928.178 latency=28101 ms
+mean_view      view    gas=      (view) latency=1530 ms
+mean           tx      gas=   3.107.467 latency=541 ms
+max_view       view    gas=      (view) latency=1943 ms
+max            tx      gas=   3.107.683 latency=540 ms
+decrypt        decrypt clear=      68 latency=1522 ms
+--- run 2/10 value=41 ---
+notarize       tx      gas=     989.236 latency=1041 ms
+add_view       view    gas=      (view) latency=395 ms
+add            tx      gas=   7.023.897 latency=29627 ms
+mul_scalar     tx      gas=   8.928.178 latency=1036 ms
+mean_view      view    gas=      (view) latency=1420 ms
+mean           tx      gas=   3.107.647 latency=1047 ms
+max_view       view    gas=      (view) latency=1917 ms
+max            tx      gas=   3.107.599 latency=1047 ms
+decrypt        decrypt clear=     109 latency=1358 ms
+--- run 3/10 value=42 ---
+notarize       tx      gas=     989.272 latency=1043 ms
+add_view       view    gas=      (view) latency=397 ms
+add            tx      gas=   7.023.897 latency=29636 ms
+mul_scalar     tx      gas=   8.928.178 latency=1541 ms
+mean_view      view    gas=      (view) latency=1411 ms
+mean           tx      gas=   3.107.743 latency=540 ms
+max_view       view    gas=      (view) latency=1883 ms
+max            tx      gas=   3.107.719 latency=529 ms
+decrypt        decrypt clear=     279 latency=1414 ms
+--- run 4/10 value=43 ---
+notarize       tx      gas=     989.308 latency=525 ms
+add_view       view    gas=      (view) latency=376 ms
+add            tx      gas=   7.023.897 latency=1547 ms
+mul_scalar     tx      gas=   8.928.178 latency=28665 ms
+mean_view      view    gas=      (view) latency=1436 ms
+mean           tx      gas=   3.107.479 latency=530 ms
+max_view       view    gas=      (view) latency=1898 ms
+max            tx      gas=   3.107.743 latency=527 ms
+decrypt        decrypt clear=     164 latency=1438 ms
+--- run 5/10 value=44 ---
+notarize       tx      gas=     989.248 latency=529 ms
+add_view       view    gas=      (view) latency=382 ms
+add            tx      gas=   7.023.897 latency=1556 ms
+mul_scalar     tx      gas=   8.928.178 latency=28608 ms
+mean_view      view    gas=      (view) latency=1437 ms
+mean           tx      gas=   3.107.563 latency=1038 ms
+max_view       view    gas=      (view) latency=1897 ms
+max            tx      gas=   3.107.683 latency=85288 ms
+decrypt        decrypt clear=     192 latency=1474 ms
+--- run 6/10 value=45 ---
+notarize       tx      gas=     989.260 latency=1044 ms
+add_view       view    gas=      (view) latency=389 ms
+add            tx      gas=   7.023.897 latency=30077 ms
+mul_scalar     tx      gas=   8.928.178 latency=1550 ms
+mean_view      view    gas=      (view) latency=1406 ms
+mean           tx      gas=   3.107.491 latency=1055 ms
+max_view       view    gas=      (view) latency=1870 ms
+max            tx      gas=   3.107.743 latency=1046 ms
+decrypt        decrypt clear=     237 latency=1490 ms
+--- run 7/10 value=46 ---
+notarize       tx      gas=     989.260 latency=1029 ms
+add_view       view    gas=      (view) latency=432 ms
+add            tx      gas=   7.023.897 latency=29587 ms
+mul_scalar     tx      gas=   8.928.178 latency=1033 ms
+mean_view      view    gas=      (view) latency=1483 ms
+mean           tx      gas=   3.107.551 latency=1057 ms
+max_view       view    gas=      (view) latency=1913 ms
+max            tx      gas=   3.107.611 latency=1043 ms
+decrypt        decrypt clear=      46 latency=1453 ms
+--- run 8/10 value=47 ---
+notarize       tx      gas=     989.212 latency=1032 ms
+add_view       view    gas=      (view) latency=415 ms
+add            tx      gas=   7.023.897 latency=29577 ms
+mul_scalar     tx      gas=   8.928.178 latency=1026 ms
+mean_view      view    gas=      (view) latency=1393 ms
+mean           tx      gas=   3.107.623 latency=1049 ms
+max_view       view    gas=      (view) latency=1895 ms
+max            tx      gas=   3.107.611 latency=1029 ms
+decrypt        decrypt clear=      47 latency=1475 ms
+--- run 9/10 value=48 ---
+notarize       tx      gas=     989.308 latency=534 ms
+add_view       view    gas=      (view) latency=393 ms
+add            tx      gas=   7.023.897 latency=1535 ms
+mul_scalar     tx      gas=   8.928.178 latency=28634 ms
+mean_view      view    gas=      (view) latency=1397 ms
+mean           tx      gas=   3.107.515 latency=1047 ms
+max_view       view    gas=      (view) latency=1904 ms
+max            tx      gas=   3.107.611 latency=1044 ms
+decrypt        decrypt clear=      84 latency=1436 ms
+--- run 10/10 value=49 ---
+notarize       tx      gas=     989.272 latency=1034 ms
+add_view       view    gas=      (view) latency=399 ms
+add            tx      gas=   7.023.897 latency=29675 ms
+mul_scalar     tx      gas=   8.928.178 latency=1033 ms
+mean_view      view    gas=      (view) latency=1398 ms
+mean           tx      gas=   3.107.455 latency=1047 ms
+max_view       view    gas=      (view) latency=1891 ms
+max            tx      gas=   3.107.839 latency=1048 ms
+decrypt        decrypt clear=     133 latency=1504 ms
+
+# Benchmark BesuFHE
+
+Modalita': mock-input-proof-native-linear-mock-zk-operation-proof-aggregates
+Gas price: 1000 wei
+
+| Operazione | n | Gas medio | Latenza media (ms) | Dev. std latenza (%) |
+|---|---:|---:|---:|---:|
+| notarize | 10 | 989.267 | 885 | 27,74 |
+| decrypt | 10 | 0 | 1456 | 3,29 |
+| add_view | 10 | 0 | 404 | 6,53 |
+| add | 10 | 7.023.897 | 18.488 | 78,28 |
+| mul_scalar | 10 | 8.928.178 | 12.123 | 116,30 |
+| mean_view | 10 | 0 | 1431 | 3,07 |
+| mean | 10 | 3.107.553 | 895 | 27,61 |
+| max_view | 10 | 0 | 1901 | 1,05 |
+| max | 10 | 3.107.684 | 9314 | 286,61 |
+
+Nota: il benchmark usa `MockNoirProofVerifier` come input-proof verifier. `add` e `mul_scalar` restano native; `mean` e `max` usano il flusso proof-backed ZK/Noir. In modalita' `mock-operation-proof`, l'adapter Noir e' reale ma il verifier Noir e' mocked per rendere il benchmark comparabile e ripetibile.
+
+JSON   : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-benchmark-20260708-180915\report.json
+Markdown: C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-benchmark-20260708-180915\summary.md
+LaTeX  : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-benchmark-20260708-180915\table.tex

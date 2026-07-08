@@ -1,0 +1,17 @@
+
+> fhebc-besu-fhe@0.1.0 benchmark:besu
+> hardhat run scripts/interact/energy-notary-benchmark-10x.ts --network fhebcBesu
+
+==========================================================================================
+BesuFHE EnergyDataNotary 10x benchmark
+==========================================================================================
+Network       : fhebcBesu (chainId 1337)
+Owner         : 0xa5e1defb98EFe38EBb2D958CEe052410247F4c80
+Notary        : 0x4e142887e3Dc6e414a9b260a1034D20C9B4Eb11F
+Input proof   : mock-input-proof
+Runs          : 10
+Gas price     : 1000 wei
+Output dir    : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-10x-20260708-024330
+==========================================================================================
+
+Warmup...

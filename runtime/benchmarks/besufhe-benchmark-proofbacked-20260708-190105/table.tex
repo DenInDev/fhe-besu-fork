@@ -1,0 +1,24 @@
+\begin{table}[H]
+\centering
+\caption{Benchmark BesuFHE su chain Besu locale}
+\label{tab:besufhe-local-benchmark}
+\begin{tabular}{lrrrr}
+\hline
+\textbf{Operazione} & \textbf{n} & \textbf{Gas medio} & \textbf{Latenza media (ms)} & \textbf{Dev. std latenza (\%)} \\
+\hline
+notarize & 10 & 989.283 & 1207 & 72,24 \\
+decrypt & 10 & 0 & 2820 & 9,59 \\
+add\_view & 10 & 0 & 791 & 82,42 \\
+add & 10 & 3.105.697 & 966 & 22,79 \\
+mul\_scalar & 10 & 3.103.859 & 912 & 27,62 \\
+mean\_view & 10 & 0 & 1977 & 4,25 \\
+mean & 10 & 3.107.526 & 1270 & 66,74 \\
+max\_view & 10 & 0 & 2734 & 4,28 \\
+max & 10 & 3.107.681 & 912 & 27,29 \\
+\hline
+\end{tabular}
+\end{table}
+\vspace{4pt}
+
+% Modalita': mock-input-proof-proof-backed-mock-zk-operation-proof-all-ops. Gas price rilevato: 1000 wei.
+% Nota: input proof verifier mocked. Operazioni tx proof-backed per evitare output FHE non deterministici tra validator; view native su singolo nodo.

@@ -1,0 +1,52 @@
+
+> fhebc-besu-fhe@0.1.0 benchmark:besu
+> hardhat run scripts/interact/energy-notary-benchmark-10x.ts --network fhebcBesu
+
+==========================================================================================
+BesuFHE EnergyDataNotary 10x benchmark
+==========================================================================================
+Network       : fhebcBesu (chainId 1337)
+Owner         : 0xa5e1defb98EFe38EBb2D958CEe052410247F4c80
+Notary        : 0x4e142887e3Dc6e414a9b260a1034D20C9B4Eb11F
+Input proof   : mock-input-proof
+Runs          : 1
+Gas price     : 1000 wei
+Output dir    : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-smoke
+==========================================================================================
+
+Warmup...
+Warmup done.
+
+--- run 1/1 value=40 ---
+notarize       tx      gas=     989.274 latency=553 ms
+add_view       view    gas=      (view) latency=268 ms
+add            tx      gas=   7.023.622 latency=1572 ms
+mul_scalar     tx      gas=   8.927.868 latency=30876 ms
+mean_view      view    gas=      (view) latency=602 ms
+mean           tx      gas=  13.004.755 latency=3186 ms
+max_view       view    gas=      (view) latency=611 ms
+max            tx      gas=  25.004.304 latency=31441 ms
+decrypt        decrypt clear=      68 latency=3713 ms
+
+# Benchmark BesuFHE
+
+Modalita': mock-input-proof
+Gas price: 1000 wei
+
+| Operazione | n | Gas medio | Latenza media (ms) | Dev. std latenza (%) |
+|---|---:|---:|---:|---:|
+| notarize | 1 | 989.274 | 553 | 0,00 |
+| decrypt | 1 | 0 | 3713 | 0,00 |
+| add_view | 1 | 0 | 268 | 0,00 |
+| add | 1 | 7.023.622 | 1572 | 0,00 |
+| mul_scalar | 1 | 8.927.868 | 30.876 | 0,00 |
+| mean_view | 1 | 0 | 602 | 0,00 |
+| mean | 1 | 13.004.755 | 3186 | 0,00 |
+| max_view | 1 | 0 | 611 | 0,00 |
+| max | 1 | 25.004.304 | 31.441 | 0,00 |
+
+Nota: il benchmark usa `MockNoirProofVerifier` come input-proof verifier per isolare storage, precompile BesuFHE e costo delle transazioni. Non misura il costo gas di un verifier Noir/Groth16 reale.
+
+JSON   : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-smoke\report.json
+Markdown: C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-smoke\summary.md
+LaTeX  : C:\Users\danie\Desktop\FHEVM_Chain\FHEBC_PROJECT\besuFHE\runtime\benchmarks\besufhe-smoke\table.tex
