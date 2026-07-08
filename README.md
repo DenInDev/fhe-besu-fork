@@ -164,12 +164,7 @@ In futuro, si esploreranno metodi più trasparenti e efficienti per la generazio
 
 Il contratto verifica la proof tramite `NoirOperationProofVerifierAdapter`, senza
 vedere il secret del coprocessore. Questa resta una prova ZK di autorizzazione e
-binding al digest, non una prova ZK completa della semantica TFHE. 
-Quindi:
-- correttezza del binding, non-riuso e disponibilita' sono gestite on-chain;
-- l'autorizzazione di un'autorità può essere verificata in zero knowledge;
-- la correttezza matematica del calcolo TFHE dipende ancora dal coprocessore,
-  a meno di introdurre una proof molto piu' pesante della semantica TFHE.
+binding al digest.
 
 ## Deploy
 
