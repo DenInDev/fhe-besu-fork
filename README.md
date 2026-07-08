@@ -298,12 +298,6 @@ FHEBC_OPERATION_ZK_SECRET=12345
 - `maxLastEntryAndEncryptedTotal()`;
 - `maxLastEntryAndEncryptedTotalProof(bytes,bytes32,bytes)`.
 
-Le funzioni `preview*` sono `view`: misurano la latenza della computazione FHE
-senza aggiornare lo storage. Le versioni non-preview salvano il risultato
-cifrato on-chain. Nel flusso consigliato per benchmark e rete multi-validator si
-usano le versioni `*Proof`, cosi' i validatori verificano una attestazione
-leggera e non devono rieseguire operazioni FHE non lineari nella transazione.
-
 ## Storage Ciphertext
 
 I ciphertext vengono salvati interamente on-chain:
