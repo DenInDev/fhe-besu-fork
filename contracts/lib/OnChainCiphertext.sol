@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @notice Stores immutable byte arrays in contract runtime code.
-/// Each data contract starts with STOP (0x00), followed by up to 24,575 bytes.
-/// A compact manifest contract contains the ordered 20-byte chunk addresses.
+/// @notice Memorizza array di byte immutabili nel codice runtime del contratto.
+/// Ogni contratto dati inizia con STOP (0x00), seguito da un massimo di 24.575 byte.
+/// Un contratto manifest compatto contiene gli indirizzi ordinati dei chunk da 20 byte.
 library OnChainCiphertext {
     uint256 internal constant MAX_CHUNK_BYTES = 24_575;
     uint256 private constant MAX_MANIFEST_CHUNKS = MAX_CHUNK_BYTES / 20;

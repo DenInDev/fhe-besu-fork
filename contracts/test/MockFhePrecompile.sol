@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @notice Hardhat-only executable mock for the FHE precompile address 0x100.
-/// It understands the same binary request/response envelope as the native Besu
-/// precompile, while treating ciphertext bytes as ABI-encoded plaintext values.
+/// @notice Mock eseguibile solo per Hardhat per l’indirizzo della precompile FHE 0x100.
+/// Si interfaccia con lo stesso binario di richiesta/risposta della precompile
+/// nativa Besu, trattando però i byte dei ciphertext come valori plaintext codificati ABI.
 contract MockFhePrecompile {
     uint8 private constant VERSION = 1;
 

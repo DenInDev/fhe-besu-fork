@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 import "../lib/OnChainCiphertext.sol";
 import "./BesuFHEProtocol.sol";
 
-/// @notice Generic middleware for contracts that need to store on-chain FHE
-/// ciphertexts and bind homomorphic operation results to reusable record ids.
-/// @dev Application contracts should expose domain-specific names and policies,
-/// while delegating ciphertext lifecycle and operation bookkeeping here.
+/// @notice Middleware generico per contratti che devono memorizzare ciphertext FHE on-chain e
+/// associare i risultati di operazioni omomorfiche a identificativi di record riutilizzabili.
+/// @dev I contratti applicativi dovrebbero esporre nomi e policy specifici del dominio,
+/// delegando qui il ciclo di vita dei ciphertext e la gestione delle operazioni.
 abstract contract BesuFHEMiddleware is BesuFHEProtocol {
     using OnChainCiphertext for OnChainCiphertext.Blob;
 

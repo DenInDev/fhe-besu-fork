@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import "./BesuFHEMiddleware.sol";
 
-/// @notice Optional protocol module for external encrypted inputs.
-/// It verifies a ZK input-validity proof, prevents replay, then stores the
-/// ciphertext through the generic BesuFHE middleware.
+/// @notice Modulo opzionale a livello di protocollo per input cifrati esterni.
+/// Verifica una prova ZK di validità dell’input, impedisce il replay, quindi
+/// memorizza il ciphertext tramite il middleware generico BesuFHE.
 abstract contract BesuFHEInputProof is BesuFHEMiddleware {
     error InvalidInputRange(uint256 minValue, uint256 maxValue);
     error InputProofAlreadyConsumed(bytes32 inputDigest);

@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import "../proof/IOperationProofVerifier.sol";
 import "./BesuFHEInputProof.sol";
 
-/// @notice Optional protocol module for proof-backed FHE operation results.
-/// It verifies an operation proof, prevents replay, then stores the resulting
-/// ciphertext through the generic BesuFHE middleware.
+/// @notice Modulo di protocollo opzionale per la gestione dei risultati di operazioni proof-backed.
+/// Verifica una prova di operazione, impedisce il replay, quindi memorizza il ciphertext risultante 
+/// tramite il middleware generico BesuFHE.
 abstract contract BesuFHEOperationProof is BesuFHEInputProof {
     error OperationProofVerifierNotConfigured();
     error InvalidOperationProof(bytes32 operationDigest);

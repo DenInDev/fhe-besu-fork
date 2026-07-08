@@ -4,10 +4,8 @@ pragma solidity ^0.8.24;
 import "../proof/IInputProofVerifier.sol";
 
 /// @title BesuFHEProtocol
-/// @notice Protocol-level primitives shared by contracts built on BesuFHE.
-/// @dev This layer verifies proof validity and defines canonical digests. It
-/// intentionally does not decide application policy such as ownership, replay,
-/// accepted value ranges, or record lifecycle.
+/// @notice Primitive a livello di protocollo, condivise dai contratti BesuFHE.
+/// @dev Questo layer verifica la validità delle proof e determina la forma dei digest.
 abstract contract BesuFHEProtocol {
     enum OperationKind {
         Add,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @notice Gestore Solidity per transazioni FHE su Besu (indirizzo FHE_PRECOMPILE)
+/// @notice Gestore Solidity per transazioni FHE su Besu (indirizzo FHE_PRECOMPILE).
 library FhePrecompile {
     address internal constant FHE_PRECOMPILE = 0x0000000000000000000000000000000000000100;
 
