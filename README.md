@@ -32,7 +32,7 @@ native/        Backend Rust TFHE-rs, JNI e tool locale di cifratura/decifratura.
 proof/         Circuito Noir per la validazione ZK degli input energetici.
 scripts/       Deploy, interazione e build delle proof.
 test/          Test Hardhat con mock della precompile e del verifier Noir.
-runtime/       Solo output locali ricreati dagli script; non e' sorgente.
+runtime/       Solo output locali ricreati dagli script; non è sorgente.
 ```
 
 File principali:
@@ -134,7 +134,7 @@ Deploy separato del verifier generato:
 npm run deploy:besu:noir-input-verifier
 ```
 
-Deploy dell'adapter, se il verifier generato e' gia' noto:
+Deploy dell'adapter, se il verifier generato è gia' noto:
 
 ```bash
 FHEBC_NOIR_INPUT_VERIFIER_ADDRESS=0x... npm run deploy:besu:input-adapter
@@ -157,7 +157,7 @@ commitment pubblica autorizzata:
 
 ```text
 authorityCommitment = Poseidon(secret)
-attestationHash    = Poseidon(secret, digestHi, digestLo)
+attestationHash = Poseidon(secret, digestHi, digestLo)
 ```
 Questo passaggio, purtroppo, richiede che il segreto sia associato a un nodo o un'autorità trusted.
 In futuro, si esploreranno metodi più trasparenti e efficienti per la generazione di proof complete di computazione.
@@ -204,7 +204,7 @@ npm run proof:prove:operation-authority -- runtime/proof-contexts/operation.json
 ```
 
 Lo script di benchmark usa automaticamente il prover Noir se
-`FHEBC_OPERATION_ZK_SECRET` e' configurato.
+`FHEBC_OPERATION_ZK_SECRET` è configurato.
 
 Il manifest viene scritto in:
 
