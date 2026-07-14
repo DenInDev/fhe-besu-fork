@@ -163,23 +163,35 @@ export function readCiphertextHex(filePath: string) {
 }
 
 export function dispatchAddU32(serverKey: string, leftFile: string, rightFile: string, outFile: string) {
-  runTfheTool(["dispatch-add-u32", serverKey, leftFile, rightFile, outFile], { allowUnsafePbs: true });
+  runTfheTool(["dispatch-add-u32", serverKey, leftFile, rightFile, outFile], {
+    allowUnsafePbs: true,
+    env: { FHEBC_NATIVE_COMPRESSED_OUTPUTS: "1", FHEBC_PACKED_OUTPUTS: "1" }
+  });
 }
 
 export function dispatchMulScalarU32(serverKey: string, inputFile: string, scalar: bigint, outFile: string) {
-  runTfheTool(["dispatch-mul-scalar-u32", serverKey, inputFile, scalar.toString(), outFile], { allowUnsafePbs: true });
+  runTfheTool(["dispatch-mul-scalar-u32", serverKey, inputFile, scalar.toString(), outFile], {
+    allowUnsafePbs: true,
+    env: { FHEBC_NATIVE_COMPRESSED_OUTPUTS: "1", FHEBC_PACKED_OUTPUTS: "1" }
+  });
 }
 
 export function dispatchMeanU32(serverKey: string, outFile: string, inputFiles: string[]) {
   if (inputFiles.length === 0) {
     throw new Error("dispatchMeanU32 requires at least one input ciphertext.");
   }
-  runTfheTool(["dispatch-mean-u32", serverKey, outFile, ...inputFiles], { allowUnsafePbs: true });
+  runTfheTool(["dispatch-mean-u32", serverKey, outFile, ...inputFiles], {
+    allowUnsafePbs: true,
+    env: { FHEBC_NATIVE_COMPRESSED_OUTPUTS: "1", FHEBC_PACKED_OUTPUTS: "1" }
+  });
 }
 
 export function dispatchMaxU32(serverKey: string, outFile: string, inputFiles: string[]) {
   if (inputFiles.length === 0) {
     throw new Error("dispatchMaxU32 requires at least one input ciphertext.");
   }
-  runTfheTool(["dispatch-max-u32", serverKey, outFile, ...inputFiles], { allowUnsafePbs: true });
+  runTfheTool(["dispatch-max-u32", serverKey, outFile, ...inputFiles], {
+    allowUnsafePbs: true,
+    env: { FHEBC_NATIVE_COMPRESSED_OUTPUTS: "1", FHEBC_PACKED_OUTPUTS: "1" }
+  });
 }

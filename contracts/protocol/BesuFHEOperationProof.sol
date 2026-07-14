@@ -19,13 +19,22 @@ abstract contract BesuFHEOperationProof is BesuFHEInputProof {
     IOperationProofVerifier public operationProofVerifier;
     bool public operationProofConfigurationFrozen;
 
-    mapping(uint256 operationId => bytes32 operationDigest) private operationProofDigests;
     mapping(bytes32 operationDigest => bool consumed) private consumedOperationProofDigests;
 
     event OperationProofVerifierUpdated(address indexed verifier);
     event OperationProofConfigurationFrozen(address indexed admin, address indexed verifier);
     event FheOperationProofAccepted(
         uint256 indexed operationId,
+        OperationKind indexed kind,
+        address indexed owner,
+        bytes32 operationDigest,
+        bytes32 inputSetHash,
+        bytes32 resultCiphertextHash,
+        bytes32 resultMetadataHash
+    );
+
+    event FheCiphertextOperationProofAccepted(
+        uint256 indexed ciphertextId,
         OperationKind indexed kind,
         address indexed owner,
         bytes32 operationDigest,
@@ -85,10 +94,6 @@ abstract contract BesuFHEOperationProof is BesuFHEInputProof {
         );
     }
 
-    function getOperationProofDigest(uint256 operationId) external view returns (bytes32) {
-        return operationProofDigests[operationId];
-    }
-
     function isOperationProofDigestConsumed(bytes32 digest) external view returns (bool) {
         return consumedOperationProofDigests[digest];
     }
@@ -112,10 +117,40 @@ abstract contract BesuFHEOperationProof is BesuFHEInputProof {
         consumedOperationProofDigests[digest] = true;
 
         operationId = _storeFheOperationWithMetadata(kind, owner, output, inputSetHash, resultMetadataHash);
-        operationProofDigests[operationId] = digest;
 
         emit FheOperationProofAccepted(
             operationId,
+            kind,
+            owner,
+            digest,
+            inputSetHash,
+            resultCiphertextHash,
+            resultMetadataHash
+        );
+    }
+
+    function _storeFheCiphertextWithOperationProof(
+        OperationKind kind,
+        address owner,
+        bytes memory output,
+        bytes32 inputSetHash,
+        bytes32 resultMetadataHash,
+        bytes32 nonce,
+        bytes calldata operationProof
+    ) internal returns (uint256 ciphertextId, bytes32 digest) {
+        bytes32 resultCiphertextHash = keccak256(output);
+        digest = operationProofDigest(owner, kind, inputSetHash, resultCiphertextHash, resultMetadataHash, nonce);
+
+        if (consumedOperationProofDigests[digest]) {
+            revert OperationProofAlreadyConsumed(digest);
+        }
+        _verifyOperationProof(digest, operationProof);
+        consumedOperationProofDigests[digest] = true;
+
+        ciphertextId = _storeFheCiphertext(owner, output, resultMetadataHash);
+
+        emit FheCiphertextOperationProofAccepted(
+            ciphertextId,
             kind,
             owner,
             digest,

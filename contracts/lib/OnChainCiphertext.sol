@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 /// @notice Memorizza array di byte immutabili nel codice runtime del contratto.
 /// Ogni contratto dati inizia con STOP (0x00), seguito da un massimo di 24.575 byte.
-/// Un contratto manifest compatto contiene gli indirizzi ordinati dei chunk da 20 byte.
+/// Per un singolo chunk, `manifest` punta direttamente al contratto dati.
+/// Per piu' chunk, un contratto manifest compatto contiene gli indirizzi ordinati da 20 byte.
 library OnChainCiphertext {
     uint256 internal constant MAX_CHUNK_BYTES = 24_575;
     uint256 private constant MAX_MANIFEST_CHUNKS = MAX_CHUNK_BYTES / 20;
@@ -24,6 +25,49 @@ library OnChainCiphertext {
     error InvalidManifest(address manifest);
     error InvalidChunk(address chunk, uint256 expectedSize, uint256 actualSize);
 
+    function writeDeduplicated(
+        Blob storage blob,
+        mapping(bytes32 => Blob) storage cache,
+        bytes memory data
+    ) internal returns (bool deployed) {
+        uint256 length = data.length;
+        if (length == 0) revert EmptyBlob();
+
+        bytes32 contentHash = keccak256(data);
+        Blob storage cached = cache[contentHash];
+        if (cached.manifest != address(0)) {
+            _copyMetadata(cached, blob);
+            return false;
+        }
+
+        write(blob, data);
+        _copyMetadata(blob, cached);
+        return true;
+    }
+
+    function writeReferenceDeduplicated(
+        Blob storage blob,
+        mapping(bytes32 => Blob) storage cache,
+        address manifest,
+        uint256 length,
+        uint256 chunkCount,
+        bytes32 contentHash
+    ) internal returns (bool inserted) {
+        if (length == 0) revert EmptyBlob();
+        if (length > type(uint32).max) revert BlobTooLarge(length);
+        if (chunkCount == 0 || chunkCount > MAX_MANIFEST_CHUNKS) revert TooManyChunks(chunkCount);
+
+        Blob storage cached = cache[contentHash];
+        if (cached.manifest != address(0)) {
+            _copyMetadata(cached, blob);
+            return false;
+        }
+
+        _setMetadata(blob, manifest, length, chunkCount, contentHash);
+        _copyMetadata(blob, cached);
+        return true;
+    }
+
     function write(Blob storage blob, bytes memory data) internal {
         uint256 length = data.length;
         if (length == 0) revert EmptyBlob();
@@ -32,18 +76,28 @@ library OnChainCiphertext {
         uint256 chunkCount = (length + MAX_CHUNK_BYTES - 1) / MAX_CHUNK_BYTES;
         if (chunkCount > MAX_MANIFEST_CHUNKS) revert TooManyChunks(chunkCount);
 
-        bytes memory manifestData = _allocateWithCopySlack(chunkCount * 20);
+        bytes memory manifestData;
+        if (chunkCount > 1) {
+            manifestData = _allocateWithCopySlack(chunkCount * 20);
+        }
+
+        address firstChunk;
         uint256 offset;
         for (uint256 i = 0; i < chunkCount; i++) {
             uint256 chunkLength = _min(MAX_CHUNK_BYTES, length - offset);
             address chunk = _deployData(data, offset, chunkLength);
-            assembly ("memory-safe") {
-                mstore(add(add(manifestData, 0x20), mul(i, 20)), shl(96, chunk))
+            if (i == 0) {
+                firstChunk = chunk;
+            }
+            if (chunkCount > 1) {
+                assembly ("memory-safe") {
+                    mstore(add(add(manifestData, 0x20), mul(i, 20)), shl(96, chunk))
+                }
             }
             offset += chunkLength;
         }
 
-        blob.manifest = _deployData(manifestData, 0, manifestData.length);
+        blob.manifest = chunkCount == 1 ? firstChunk : _deployData(manifestData, 0, manifestData.length);
         blob.length = uint32(length);
         blob.chunkCount = uint16(chunkCount);
         blob.contentHash = keccak256(data);
@@ -55,8 +109,13 @@ library OnChainCiphertext {
         address manifest = blob.manifest;
         if (length == 0 || chunkCount == 0 || manifest == address(0)) revert EmptyBlob();
 
-        bytes memory chunkAddresses = _readManifest(manifest, chunkCount);
         data = new bytes(length);
+        if (chunkCount == 1) {
+            _copyChunk(data, manifest, 0, length);
+            return data;
+        }
+
+        bytes memory chunkAddresses = _readManifest(manifest, chunkCount);
         uint256 written;
         for (uint256 i = 0; i < chunkCount; i++) {
             uint256 chunkLength = _min(MAX_CHUNK_BYTES, length - written);
@@ -96,6 +155,26 @@ library OnChainCiphertext {
             pointer := create(0, add(creationCode, 0x20), mload(creationCode))
         }
         if (pointer == address(0)) revert DeploymentFailed();
+    }
+
+    function _copyMetadata(Blob storage source, Blob storage destination) private {
+        destination.manifest = source.manifest;
+        destination.length = source.length;
+        destination.chunkCount = source.chunkCount;
+        destination.contentHash = source.contentHash;
+    }
+
+    function _setMetadata(
+        Blob storage blob,
+        address manifest,
+        uint256 length,
+        uint256 chunkCount,
+        bytes32 contentHash
+    ) private {
+        blob.manifest = manifest;
+        blob.length = uint32(length);
+        blob.chunkCount = uint16(chunkCount);
+        blob.contentHash = contentHash;
     }
 
     function _readManifest(address manifest, uint256 chunkCount) private view returns (bytes memory chunkAddresses) {

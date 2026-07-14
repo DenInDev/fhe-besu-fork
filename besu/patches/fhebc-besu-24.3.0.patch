@@ -206,9 +206,9 @@ index 0000000..4a761c7
 +    try {
 +      final FheRequest request = FheCodec.decodeRequest(input.toArrayUnsafe());
 +      return switch (request.operation()) {
-+        case FheConstants.OP_ADD -> 4_000_000L;
++        case FheConstants.OP_ADD -> 500_000L;
 +        case FheConstants.OP_SUB -> 4_000_000L;
-+        case FheConstants.OP_MUL_SCALAR -> 6_000_000L;
++        case FheConstants.OP_MUL_SCALAR -> 750_000L;
 +        case FheConstants.OP_EQ -> 12_000_000L;
 +        case FheConstants.OP_LT -> 18_000_000L;
 +        case FheConstants.OP_SELECT -> 12_000_000L;

@@ -10,6 +10,7 @@ contracts/generated/
 native/target/
 prover/target/
 runtime/besu/
+runtime/
 runtime/deployments/
 runtime/keys/
 runtime/native/
@@ -18,8 +19,9 @@ runtime/secrets/
 runtime/config/*.key
 runtime/config/*.seed
 runtime/config/coprocessor-ed25519.pub
-proof/noir/**/target/
-proof/noir/**/Prover.toml
+proof/groth16/**/target/
+proof/groth16/ptau/
 deployments/
+besu/network/hs_err_pid*.log
 besu/source/.gradle/
 besu/source/**/build/

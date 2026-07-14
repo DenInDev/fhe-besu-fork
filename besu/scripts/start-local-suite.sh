@@ -35,6 +35,11 @@ fi
 
 export BESU_DIR
 export FHEBC_TFHE_SERVER_KEY_PATH
+export FHEBC_NATIVE_COMPRESSED_OUTPUTS="${FHEBC_NATIVE_COMPRESSED_OUTPUTS:-0}"
+if [ -n "${RAYON_NUM_THREADS:-}" ]; then
+  export RAYON_NUM_THREADS
+fi
+unset FHEBC_PACKED_OUTPUTS
 export LD_LIBRARY_PATH="$NATIVE_RELEASE_DIR:${LD_LIBRARY_PATH:-}"
 if [ -z "${JAVA_OPTS:-}" ]; then
   export JAVA_OPTS="-XX:TieredStopAtLevel=1 -Djava.library.path=$NATIVE_RELEASE_DIR"
@@ -48,6 +53,8 @@ echo "==========================================================================
 echo "BESU_DIR                 : $BESU_DIR"
 echo "Native library dir       : $NATIVE_RELEASE_DIR"
 echo "FHEBC_TFHE_SERVER_KEY_PATH: $FHEBC_TFHE_SERVER_KEY_PATH"
+echo "Native compressed outputs: $FHEBC_NATIVE_COMPRESSED_OUTPUTS"
+echo "RAYON_NUM_THREADS         : ${RAYON_NUM_THREADS:-<default>}"
 echo "Network dir              : $LOCAL_SUITE_BESU_NETWORK"
 echo
 

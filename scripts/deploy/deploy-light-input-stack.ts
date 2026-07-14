@@ -7,25 +7,14 @@ type TxOverrides = {
   gasPrice: bigint;
 };
 
-async function deployGeneratedNoirVerifier(txOverrides: TxOverrides) {
-  if (!(await artifacts.artifactExists("NoirEnergyInputGeneratedVerifier"))) {
+async function deployGeneratedGroth16InputVerifier(txOverrides: TxOverrides) {
+  if (!(await artifacts.artifactExists("Groth16EnergyInputGeneratedVerifier"))) {
     throw new Error(
-      [
-        "Input proof verifier missing.",
-        "Set FHEBC_INPUT_PROOF_VERIFIER_ADDRESS to an existing IInputProofVerifier,",
-        "or set FHEBC_NOIR_INPUT_VERIFIER_ADDRESS to a generated Noir verifier,",
-        "or run `npm run proof:build:energy-input` followed by `npm run compile`."
-      ].join(" ")
+      "Groth16EnergyInputGeneratedVerifier missing. Run `npm run proof:build:energy-input:groth16` and `npm run compile`, or set FHEBC_GROTH16_INPUT_VERIFIER_ADDRESS."
     );
   }
 
-  const TranscriptLib = await ethers.getContractFactory("ZKTranscriptLib");
-  const transcriptLib = await TranscriptLib.deploy(txOverrides);
-  await transcriptLib.waitForDeployment();
-
-  const Verifier = await ethers.getContractFactory("NoirEnergyInputGeneratedVerifier", {
-    libraries: { ZKTranscriptLib: await transcriptLib.getAddress() }
-  });
+  const Verifier = await ethers.getContractFactory("Groth16EnergyInputGeneratedVerifier");
   const verifier = await Verifier.deploy(txOverrides);
   await verifier.waitForDeployment();
   return verifier.getAddress();
@@ -37,15 +26,20 @@ async function resolveInputProofVerifier(txOverrides: TxOverrides) {
     return { address: configuredVerifier, mode: "configured-input-proof-verifier" };
   }
 
-  const generatedVerifier = process.env.FHEBC_NOIR_INPUT_VERIFIER_ADDRESS ?? await deployGeneratedNoirVerifier(txOverrides);
-  const Adapter = await ethers.getContractFactory("NoirEnergyInputVerifierAdapter");
+  const backend = (process.env.FHEBC_INPUT_PROOF_BACKEND ?? "groth16").toLowerCase();
+  if (backend !== "groth16") {
+    throw new Error(`Unsupported input proof backend: ${backend}. BesuFHE now uses Groth16.`);
+  }
+  const generatedVerifier =
+    process.env.FHEBC_GROTH16_INPUT_VERIFIER_ADDRESS ?? await deployGeneratedGroth16InputVerifier(txOverrides);
+  const Adapter = await ethers.getContractFactory("Groth16EnergyInputVerifierAdapter");
   const adapter = await Adapter.deploy(generatedVerifier, txOverrides);
   await adapter.waitForDeployment();
   if (process.env.FHEBC_FREEZE_INPUT_PROOF_ADAPTER !== "0") {
     await (await adapter.freezeConfiguration(txOverrides)).wait();
   }
 
-  return { address: await adapter.getAddress(), mode: "noir-input-proof-adapter" };
+  return { address: await adapter.getAddress(), mode: `${backend}-input-proof-adapter` };
 }
 
 async function resolveOperationProofVerifier(txOverrides: TxOverrides) {
@@ -56,36 +50,34 @@ async function resolveOperationProofVerifier(txOverrides: TxOverrides) {
 
   const commitment = process.env.FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT;
   if (!commitment || !ethers.isHexString(commitment, 32)) {
-    throw new Error("Set FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT to deploy the Noir operation proof verifier.");
+    throw new Error("Set FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT to deploy the Groth16 operation proof verifier.");
   }
 
-  let generatedVerifier = process.env.FHEBC_NOIR_OPERATION_VERIFIER_ADDRESS;
+  const backend = (process.env.FHEBC_OPERATION_PROOF_BACKEND ?? "groth16").toLowerCase();
+  if (backend !== "groth16") {
+    throw new Error(`Unsupported operation proof backend: ${backend}. BesuFHE now uses Groth16.`);
+  }
+  let generatedVerifier = process.env.FHEBC_GROTH16_OPERATION_VERIFIER_ADDRESS;
   if (!generatedVerifier) {
-    if (!(await artifacts.artifactExists("NoirOperationGeneratedVerifier"))) {
+    if (!(await artifacts.artifactExists("Groth16OperationGeneratedVerifier"))) {
       throw new Error(
-        "NoirOperationGeneratedVerifier missing. Run `npm run proof:build:operation-authority` and `npm run compile`, or set FHEBC_NOIR_OPERATION_VERIFIER_ADDRESS."
+        "Groth16OperationGeneratedVerifier missing. Run `npm run proof:build:operation-authority:groth16` and `npm run compile`, or set FHEBC_GROTH16_OPERATION_VERIFIER_ADDRESS."
       );
     }
-    const TranscriptLib = await ethers.getContractFactory("ZKTranscriptLib");
-    const transcriptLib = await TranscriptLib.deploy(txOverrides);
-    await transcriptLib.waitForDeployment();
-
-    const Verifier = await ethers.getContractFactory("NoirOperationGeneratedVerifier", {
-      libraries: { ZKTranscriptLib: await transcriptLib.getAddress() }
-    });
+    const Verifier = await ethers.getContractFactory("Groth16OperationGeneratedVerifier");
     const verifier = await Verifier.deploy(txOverrides);
     await verifier.waitForDeployment();
     generatedVerifier = await verifier.getAddress();
   }
 
-  const Adapter = await ethers.getContractFactory("NoirOperationProofVerifierAdapter");
+  const Adapter = await ethers.getContractFactory("Groth16OperationProofVerifierAdapter");
   const adapter = await Adapter.deploy(generatedVerifier, commitment, txOverrides);
   await adapter.waitForDeployment();
   if (process.env.FHEBC_FREEZE_OPERATION_PROOF_ADAPTER !== "0") {
     await (await adapter.freezeConfiguration(txOverrides)).wait();
   }
 
-  return { address: await adapter.getAddress(), mode: "noir-operation-proof-verifier" };
+  return { address: await adapter.getAddress(), mode: `${backend}-operation-proof-verifier` };
 }
 
 async function main() {

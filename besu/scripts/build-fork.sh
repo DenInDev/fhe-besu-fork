@@ -30,10 +30,16 @@ echo "Native lib  : $NATIVE_LIB"
 echo
 
 cd "$BESU_SRC"
-./gradlew --no-daemon installDist -x test
-rm -rf "$RUNTIME_BESU"
-mkdir -p "$RUNTIME_BESU"
-cp -a "$BESU_SRC/build/install/besu/." "$RUNTIME_BESU/"
+if [ -x "$RUNTIME_BESU/bin/besu" ]; then
+  ./gradlew --no-daemon --console=plain :evm:jar -x test
+  cp -f "$BESU_SRC/evm/build/libs/besu-evm-24.2.0-SNAPSHOT.jar" \
+    "$RUNTIME_BESU/lib/besu-evm-24.2.0-SNAPSHOT.jar"
+else
+  ./gradlew --no-daemon --console=plain installDist -x test
+  rm -rf "$RUNTIME_BESU"
+  mkdir -p "$RUNTIME_BESU"
+  cp -a "$BESU_SRC/build/install/besu/." "$RUNTIME_BESU/"
+fi
 
 echo
 echo "Forked Besu distribution:"

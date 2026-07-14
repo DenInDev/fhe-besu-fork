@@ -108,13 +108,15 @@ contract EnergyDataNotaryOnChain is BesuFHEOperationProof {
 
     // Aggiunge l'ultima entry energetica al totale energetico relativo a un utente (senza operationProof)
     function addLastEntryToEncryptedTotal() external returns (bytes memory output) {
-        (bytes memory lastEntry, bytes memory encryptedTotal, bytes32 inputSetHash) = _lastEntryAndTotal(msg.sender);
-        
-        output = FhePrecompile.addU32At(_fhePrecompile(), encryptedTotal, lastEntry);
-        uint256 operationId = _storeFheOperation(OperationKind.Add, msg.sender, output, inputSetHash);
+        uint256 lastEntryId = _requireLastEntryId(msg.sender);
+        uint256 encryptedTotalId = _requireEncryptedTotalId(msg.sender);
 
-        encryptedTotalIds[msg.sender] = _fheOperationResultCiphertextId(operationId);
-        _emitResult(OperationKind.Add, encryptedTotalIds[msg.sender], output.length);
+        FhePrecompile.BlobRef memory result =
+            FhePrecompile.addStoredU32At(_fhePrecompile(), _ciphertextRef(encryptedTotalId), _ciphertextRef(lastEntryId));
+
+        encryptedTotalIds[msg.sender] = _storeNativeCiphertextResult(result);
+        _emitResult(OperationKind.Add, encryptedTotalIds[msg.sender], result.length);
+        return "";
     }
 
     // Aggiunge l'ultima entry energetica al totale energetico relativo a un utente (con operationProof)
@@ -124,9 +126,9 @@ contract EnergyDataNotaryOnChain is BesuFHEOperationProof {
         bytes calldata operationProof
     ) external returns (bytes memory) {
         bytes32 inputSetHash = _lastEntryAndTotalHash(msg.sender);
-        (uint256 operationId,) =
-            _storeFheOperationWithProof(OperationKind.Add, msg.sender, output, inputSetHash, bytes32(0), nonce, operationProof);
-        encryptedTotalIds[msg.sender] = _fheOperationResultCiphertextId(operationId);
+        (uint256 ciphertextId,) =
+            _storeFheCiphertextWithOperationProof(OperationKind.Add, msg.sender, output, inputSetHash, bytes32(0), nonce, operationProof);
+        encryptedTotalIds[msg.sender] = ciphertextId;
         _emitResult(OperationKind.Add, encryptedTotalIds[msg.sender], output.length);
         return output;
     }
@@ -138,13 +140,15 @@ contract EnergyDataNotaryOnChain is BesuFHEOperationProof {
     // Moltiplica l'ultima entry energetica con un valore scalare (senza operationProof)
     function multiplyLastEntryByConstant(uint64 scalar) external returns (bytes memory output) {
         uint256 lastEntryId = _requireLastEntryId(msg.sender);
-        output = FhePrecompile.mulScalarU32At(_fhePrecompile(), _fheCiphertextBytes(lastEntryId), scalar);
-
         bytes32 inputSetHash = _fheScalarInputHash(lastEntryId, msg.sender, scalar);
-        uint256 operationId = _storeFheOperation(OperationKind.MulScalar, msg.sender, output, inputSetHash);
+
+        FhePrecompile.BlobRef memory result =
+            FhePrecompile.mulScalarStoredU32At(_fhePrecompile(), _ciphertextRef(lastEntryId), scalar);
+        uint256 operationId = _storeNativeOperationResult(OperationKind.MulScalar, result, inputSetHash);
 
         lastResultIds[msg.sender] = _fheOperationResultCiphertextId(operationId);
-        _emitResult(OperationKind.MulScalar, lastResultIds[msg.sender], output.length);
+        _emitResult(OperationKind.MulScalar, lastResultIds[msg.sender], result.length);
+        return "";
     }
 
     // Moltiplica l'ultima entry energetica con un valore scalare (con operationProof)
@@ -287,6 +291,40 @@ contract EnergyDataNotaryOnChain is BesuFHEOperationProof {
             resultCiphertextId,
             _fheCiphertextHash(resultCiphertextId),
             ciphertextLength
+        );
+    }
+
+    function _ciphertextRef(uint256 ciphertextId) private view returns (FhePrecompile.BlobRef memory ref) {
+        (address manifest, uint256 ciphertextLength, uint256 chunkCount, bytes32 contentHash) =
+            getFheCiphertextStorage(ciphertextId);
+        ref = FhePrecompile.BlobRef(manifest, uint32(ciphertextLength), uint16(chunkCount), contentHash);
+    }
+
+    function _storeNativeOperationResult(
+        OperationKind kind,
+        FhePrecompile.BlobRef memory result,
+        bytes32 inputSetHash
+    ) private returns (uint256 operationId) {
+        return _storeFheOperationReference(
+            kind,
+            msg.sender,
+            result.manifest,
+            result.length,
+            result.chunkCount,
+            result.contentHash,
+            inputSetHash,
+            bytes32(0)
+        );
+    }
+
+    function _storeNativeCiphertextResult(FhePrecompile.BlobRef memory result) private returns (uint256 ciphertextId) {
+        return _storeFheCiphertextReference(
+            msg.sender,
+            result.manifest,
+            result.length,
+            result.chunkCount,
+            result.contentHash,
+            bytes32(0)
         );
     }
 

@@ -57,7 +57,12 @@ function parseLastJsonLine(output: string) {
 }
 
 function runInputProofCommand(contextPath: string) {
-  const command = process.env.FHEBC_ZK_PROOF_COMMAND ?? "node scripts/proof/prove-energy-input-noir.js";
+  const backend = (process.env.FHEBC_INPUT_PROOF_BACKEND ?? "groth16").toLowerCase();
+  if (backend !== "groth16") {
+    throw new Error(`Unsupported input proof backend: ${backend}. BesuFHE now uses Groth16.`);
+  }
+  const defaultCommand = "node scripts/proof/groth16/prove-energy-input.js";
+  const command = process.env.FHEBC_ZK_PROOF_COMMAND ?? defaultCommand;
   const output = execSync(`${command} ${JSON.stringify(contextPath)}`, {
     cwd: projectPath(),
     encoding: "utf8",
@@ -75,21 +80,14 @@ function runInputProofCommand(contextPath: string) {
   return parsed as { metadataHash: string; proof: string };
 }
 
-async function deployGeneratedNoirVerifier(txOverrides: TxOverrides) {
-  if (!(await artifacts.artifactExists("NoirEnergyInputGeneratedVerifier"))) {
+async function deployGeneratedGroth16InputVerifier(txOverrides: TxOverrides) {
+  if (!(await artifacts.artifactExists("Groth16EnergyInputGeneratedVerifier"))) {
     throw new Error(
-      "No input verifier configured. Set FHEBC_INPUT_PROOF_VERIFIER_ADDRESS or FHEBC_NOIR_INPUT_VERIFIER_ADDRESS, " +
-        "or build the Noir verifier with `npm run proof:build:energy-input` and recompile."
+      "Groth16EnergyInputGeneratedVerifier missing. Run `npm run proof:build:energy-input:groth16` and then `npm run compile`."
     );
   }
 
-  const TranscriptLib = await ethers.getContractFactory("ZKTranscriptLib");
-  const transcriptLib = await TranscriptLib.deploy(txOverrides);
-  await transcriptLib.waitForDeployment();
-
-  const Verifier = await ethers.getContractFactory("NoirEnergyInputGeneratedVerifier", {
-    libraries: { ZKTranscriptLib: await transcriptLib.getAddress() }
-  });
+  const Verifier = await ethers.getContractFactory("Groth16EnergyInputGeneratedVerifier");
   const verifier = await Verifier.deploy(txOverrides);
   await verifier.waitForDeployment();
   return verifier.getAddress();
@@ -100,8 +98,13 @@ async function deployOrResolveInputProofVerifier(txOverrides: TxOverrides) {
     return process.env.FHEBC_INPUT_PROOF_VERIFIER_ADDRESS;
   }
 
-  const generatedVerifier = process.env.FHEBC_NOIR_INPUT_VERIFIER_ADDRESS ?? await deployGeneratedNoirVerifier(txOverrides);
-  const Adapter = await ethers.getContractFactory("NoirEnergyInputVerifierAdapter");
+  const backend = (process.env.FHEBC_INPUT_PROOF_BACKEND ?? "groth16").toLowerCase();
+  if (backend !== "groth16") {
+    throw new Error(`Unsupported input proof backend: ${backend}. BesuFHE now uses Groth16.`);
+  }
+  const generatedVerifier =
+    process.env.FHEBC_GROTH16_INPUT_VERIFIER_ADDRESS ?? await deployGeneratedGroth16InputVerifier(txOverrides);
+  const Adapter = await ethers.getContractFactory("Groth16EnergyInputVerifierAdapter");
   const adapter = await Adapter.deploy(generatedVerifier, txOverrides);
   await adapter.waitForDeployment();
   if (process.env.FHEBC_FREEZE_INPUT_PROOF_ADAPTER !== "0") {

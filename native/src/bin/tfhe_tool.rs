@@ -11,15 +11,19 @@ fn real_main() -> Result<(), Box<dyn std::error::Error>> {
     use std::path::Path;
     use tfhe::prelude::*;
     use tfhe::safe_serialization::{safe_deserialize, safe_serialize};
+    use tfhe::shortint::parameters::COMP_PARAM_MESSAGE_2_CARRY_2_KS_PBS_TUNIFORM_2M128;
     use tfhe::{
-        generate_keys, set_server_key, ClientKey, CompressedFheBool, CompressedFheUint32,
-        ConfigBuilder, FheBool, FheUint32, ServerKey,
+        generate_keys, set_server_key, ClientKey, CompressedCiphertextList,
+        CompressedCiphertextListBuilder, CompressedFheBool, CompressedFheUint32, ConfigBuilder,
+        FheBool, FheUint32, ServerKey,
     };
 
     const MAX_KEY_BYTES: u64 = 1 << 30;
     const MAX_CIPHERTEXT_BYTES: u64 = 16 * 1024 * 1024;
     const COMPRESSED_U32_MAGIC: &[u8; 8] = b"FBCU32C1";
     const COMPRESSED_BOOL_MAGIC: &[u8; 8] = b"FBCBOLC1";
+    const PACKED_U32_MAGIC: &[u8; 8] = b"FBCU32P1";
+    const PACKED_BOOL_MAGIC: &[u8; 8] = b"FBCBOLP1";
 
     fn read_client_key(path: &str) -> Result<ClientKey, Box<dyn std::error::Error>> {
         let data = fs::read(path)?;
@@ -129,6 +133,14 @@ fn real_main() -> Result<(), Box<dyn std::error::Error>> {
 
     fn read_u32_ciphertext(path: &str) -> Result<FheUint32, Box<dyn std::error::Error>> {
         let data = fs::read(path)?;
+        if let Some(payload) = strip_magic(&data, PACKED_U32_MAGIC) {
+            ensure_optional_server_key()?;
+            let compressed =
+                safe_deserialize::<CompressedCiphertextList>(payload, MAX_CIPHERTEXT_BYTES)?;
+            return compressed
+                .get::<FheUint32>(0)?
+                .ok_or_else(|| "packed ciphertext list does not contain an FheUint32".into());
+        }
         if let Some(payload) = strip_magic(&data, COMPRESSED_U32_MAGIC) {
             ensure_optional_server_key()?;
             let compressed =
@@ -143,6 +155,14 @@ fn real_main() -> Result<(), Box<dyn std::error::Error>> {
 
     fn read_bool_ciphertext(path: &str) -> Result<FheBool, Box<dyn std::error::Error>> {
         let data = fs::read(path)?;
+        if let Some(payload) = strip_magic(&data, PACKED_BOOL_MAGIC) {
+            ensure_optional_server_key()?;
+            let compressed =
+                safe_deserialize::<CompressedCiphertextList>(payload, MAX_CIPHERTEXT_BYTES)?;
+            return compressed
+                .get::<FheBool>(0)?
+                .ok_or_else(|| "packed ciphertext list does not contain an FheBool".into());
+        }
         if let Some(payload) = strip_magic(&data, COMPRESSED_BOOL_MAGIC) {
             ensure_optional_server_key()?;
             let compressed = safe_deserialize::<CompressedFheBool>(payload, MAX_CIPHERTEXT_BYTES)?;
@@ -165,7 +185,9 @@ fn real_main() -> Result<(), Box<dyn std::error::Error>> {
             if args.len() != 4 {
                 return Err("usage: tfhe_tool keygen <client.key> <server.key>".into());
             }
-            let config = ConfigBuilder::default().build();
+            let config = ConfigBuilder::default()
+                .enable_compression(COMP_PARAM_MESSAGE_2_CARRY_2_KS_PBS_TUNIFORM_2M128)
+                .build();
             let (client_key, server_key) = generate_keys(config);
             let server_key = force_deterministic_pbs(server_key);
             write_client_key(&client_key, &args[2])?;
@@ -276,12 +298,18 @@ fn real_main() -> Result<(), Box<dyn std::error::Error>> {
             }
             std::env::set_var("FHEBC_TFHE_SERVER_KEY_PATH", &args[2]);
             let input_bytes = fs::read(&args[3])?;
-            let compressed_output = strip_magic(&input_bytes, COMPRESSED_U32_MAGIC).is_some();
+            let compressed_output = strip_magic(&input_bytes, COMPRESSED_U32_MAGIC).is_some()
+                || strip_magic(&input_bytes, PACKED_U32_MAGIC).is_some();
             let left = read_u32_ciphertext(&args[3])?;
             let scalar = args[4].parse::<u32>()?;
             let result = &left * scalar;
             if compressed_output {
-                write_compressed_u32_ciphertext(&result.compress(), &args[5])?;
+                let mut builder = CompressedCiphertextListBuilder::new();
+                builder.push(result);
+                let packed = builder.build()?;
+                let mut out = Vec::new();
+                safe_serialize(&packed, &mut out, MAX_CIPHERTEXT_BYTES)?;
+                write_bytes(&args[5], wrap_magic(PACKED_U32_MAGIC, out))?;
             } else {
                 write_u32_ciphertext(&result, &args[5])?;
             }

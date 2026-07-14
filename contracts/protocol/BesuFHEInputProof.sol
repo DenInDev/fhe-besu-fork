@@ -10,7 +10,6 @@ abstract contract BesuFHEInputProof is BesuFHEMiddleware {
     error InvalidInputRange(uint256 minValue, uint256 maxValue);
     error InputProofAlreadyConsumed(bytes32 inputDigest);
 
-    mapping(uint256 => bytes32) private inputProofDigests;
     mapping(bytes32 => bool) private consumedInputProofDigests;
 
     event FheInputProofAccepted(
@@ -41,10 +40,6 @@ abstract contract BesuFHEInputProof is BesuFHEMiddleware {
         return _verifiedInputDigest(owner, ciphertextHash, inputContextHash(metadataHash, minValue, maxValue), nonce);
     }
 
-    function getInputProofDigest(uint256 ciphertextId) external view returns (bytes32) {
-        return inputProofDigests[ciphertextId];
-    }
-
     function isInputProofDigestConsumed(bytes32 inputDigest) external view returns (bool) {
         return consumedInputProofDigests[inputDigest];
     }
@@ -72,7 +67,6 @@ abstract contract BesuFHEInputProof is BesuFHEMiddleware {
         consumedInputProofDigests[inputDigest] = true;
 
         ciphertextId = _storeFheCiphertext(owner, ciphertext, metadataHash);
-        inputProofDigests[ciphertextId] = inputDigest;
 
         emit FheInputProofAccepted(ciphertextId, owner, inputDigest, metadataHash, minValue, maxValue);
     }

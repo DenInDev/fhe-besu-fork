@@ -6,6 +6,7 @@ library FhePrecompile {
     address internal constant FHE_PRECOMPILE = 0x0000000000000000000000000000000000000100;
 
     uint8 internal constant VERSION = 1;
+    uint8 internal constant VERSION_STORED = 2;
 
     uint8 internal constant STATUS_OK = 0;
 
@@ -24,6 +25,13 @@ library FhePrecompile {
     uint8 internal constant TYPE_EUINT32 = 4;
 
     uint16 internal constant PARAM_TFHE_UINT32_V1 = 1;
+
+    struct BlobRef {
+        address manifest;
+        uint32 length;
+        uint16 chunkCount;
+        bytes32 contentHash;
+    }
 
     error FheOperationFailed(bytes returnData);
     error FheMalformedOutput();
@@ -44,6 +52,16 @@ library FhePrecompile {
         return _call(target, OP_ADD, TYPE_EUINT32, TYPE_EUINT32, PARAM_TFHE_UINT32_V1, operands);
     }
 
+    function addStoredU32At(address target, BlobRef memory lhs, BlobRef memory rhs)
+        internal
+        returns (BlobRef memory)
+    {
+        BlobRef[] memory operands = new BlobRef[](2);
+        operands[0] = lhs;
+        operands[1] = rhs;
+        return _callStored(target, OP_ADD, TYPE_EUINT32, TYPE_EUINT32, PARAM_TFHE_UINT32_V1, operands, "");
+    }
+
     function subU32(bytes memory lhs, bytes memory rhs) internal view returns (bytes memory) {
         return subU32At(FHE_PRECOMPILE, lhs, rhs);
     }
@@ -60,6 +78,23 @@ library FhePrecompile {
     function mulScalarU32At(address target, bytes memory ciphertext, uint64 scalar) internal view returns (bytes memory) {
         bytes[] memory operands = _two(ciphertext, abi.encodePacked(scalar));
         return _call(target, OP_MUL_SCALAR, TYPE_EUINT32, TYPE_EUINT32, PARAM_TFHE_UINT32_V1, operands);
+    }
+
+    function mulScalarStoredU32At(address target, BlobRef memory ciphertext, uint64 scalar)
+        internal
+        returns (BlobRef memory)
+    {
+        BlobRef[] memory operands = new BlobRef[](1);
+        operands[0] = ciphertext;
+        return _callStored(
+            target,
+            OP_MUL_SCALAR,
+            TYPE_EUINT32,
+            TYPE_EUINT32,
+            PARAM_TFHE_UINT32_V1,
+            operands,
+            abi.encodePacked(scalar)
+        );
     }
 
     function eqU32(bytes memory lhs, bytes memory rhs) internal view returns (bytes memory) {
@@ -132,6 +167,26 @@ library FhePrecompile {
         return _decodeResponse(output, expectedOutputType, parameterSet);
     }
 
+    function _callStored(
+        address target,
+        uint8 operation,
+        uint8 inputType,
+        uint8 expectedOutputType,
+        uint16 parameterSet,
+        BlobRef[] memory operands,
+        bytes memory extra
+    ) private returns (BlobRef memory result) {
+        bytes memory request = _encodeStoredRequest(operation, inputType, parameterSet, operands, extra);
+        (bool success, bytes memory output) = target.call(request);
+        if (!success) {
+            revert FheOperationFailed(output);
+        }
+        bytes memory payload = _decodeResponse(output, expectedOutputType, parameterSet);
+        (address manifest, uint32 length, uint16 chunkCount, bytes32 contentHash) =
+            abi.decode(payload, (address, uint32, uint16, bytes32));
+        return BlobRef(manifest, length, chunkCount, contentHash);
+    }
+
     function _encodeRequest(uint8 operation, uint8 dataType, uint16 parameterSet, bytes[] memory operands)
         internal
         pure
@@ -144,6 +199,28 @@ library FhePrecompile {
             }
             encoded = bytes.concat(encoded, abi.encodePacked(uint32(operands[i].length)), operands[i]);
         }
+    }
+
+    function _encodeStoredRequest(
+        uint8 operation,
+        uint8 dataType,
+        uint16 parameterSet,
+        BlobRef[] memory operands,
+        bytes memory extra
+    ) private pure returns (bytes memory encoded) {
+        encoded = abi.encodePacked(VERSION_STORED, operation, dataType, parameterSet, uint8(operands.length));
+        for (uint256 i = 0; i < operands.length; i++) {
+            encoded = bytes.concat(
+                encoded,
+                abi.encodePacked(
+                    operands[i].manifest,
+                    uint32(operands[i].length),
+                    uint16(operands[i].chunkCount),
+                    operands[i].contentHash
+                )
+            );
+        }
+        encoded = bytes.concat(encoded, extra);
     }
 
     function _decodeResponse(bytes memory output, uint8 expectedOutputType, uint16 expectedParameterSet)

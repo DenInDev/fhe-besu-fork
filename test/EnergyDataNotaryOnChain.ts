@@ -22,20 +22,20 @@ describe("EnergyDataNotaryOnChain", function () {
     const notary: any = await Notary.deploy(await mock.getAddress());
     await notary.waitForDeployment();
 
-    const GeneratedVerifier = await ethers.getContractFactory("MockNoirProofVerifier");
+    const GeneratedVerifier = await ethers.getContractFactory("MockGroth16EnergyInputVerifier");
     const generatedVerifier: any = await GeneratedVerifier.deploy(true);
     await generatedVerifier.waitForDeployment();
 
-    const Adapter = await ethers.getContractFactory("NoirEnergyInputVerifierAdapter");
+    const Adapter = await ethers.getContractFactory("Groth16EnergyInputVerifierAdapter");
     const adapter: any = await Adapter.deploy(await generatedVerifier.getAddress());
     await adapter.waitForDeployment();
     await notary.setInputProofVerifier(await adapter.getAddress());
 
-    const OperationGeneratedVerifier = await ethers.getContractFactory("MockNoirProofVerifier");
+    const OperationGeneratedVerifier = await ethers.getContractFactory("MockGroth16OperationVerifier");
     const operationGeneratedVerifier: any = await OperationGeneratedVerifier.deploy(true);
     await operationGeneratedVerifier.waitForDeployment();
 
-    const OperationAdapter = await ethers.getContractFactory("NoirOperationProofVerifierAdapter");
+    const OperationAdapter = await ethers.getContractFactory("Groth16OperationProofVerifierAdapter");
     const operationAdapter: any = await OperationAdapter.deploy(
       await operationGeneratedVerifier.getAddress(),
       OPERATION_AUTHORITY_COMMITMENT
@@ -62,13 +62,38 @@ describe("EnergyDataNotaryOnChain", function () {
         maxValue,
         nonce
       );
-      const rawPublicInputs = await adapter.publicInputs(inputOwner, ciphertextHash, metadataHash, minValue, maxValue);
+      const rawPublicInputs = await adapter.publicSignals(inputOwner, ciphertextHash, metadataHash, minValue, maxValue);
       const publicInputs = Array.from(rawPublicInputs);
-      await generatedVerifier.setExpectedPublicInputs(publicInputs);
+      await generatedVerifier.setExpectedPublicSignals(publicInputs);
 
       const proof = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["address", "bytes32", "bytes32", "uint256", "uint256", "bytes32", "bytes", "bytes32[]"],
-        [inputOwner, ciphertextHash, metadataHash, minValue, maxValue, nonce, "0x1234", publicInputs]
+        [
+          "address",
+          "bytes32",
+          "bytes32",
+          "uint256",
+          "uint256",
+          "bytes32",
+          "uint256[2]",
+          "uint256[2][2]",
+          "uint256[2]",
+          "uint256[6]"
+        ],
+        [
+          inputOwner,
+          ciphertextHash,
+          metadataHash,
+          minValue,
+          maxValue,
+          nonce,
+          [0, 0],
+          [
+            [0, 0],
+            [0, 0]
+          ],
+          [0, 0],
+          publicInputs
+        ]
       );
 
       return { metadataHash, minValue, maxValue, nonce, proof, digest };
@@ -91,22 +116,66 @@ describe("EnergyDataNotaryOnChain", function () {
         nonce
       );
       const attestationHash = ethers.toBeHex(BigInt(ethers.id(`${nonceLabel}:attestation`)) % (1n << 128n), 32);
-      const rawPublicInputs = await operationAdapter.publicInputs(
+      const rawPublicInputs = await operationAdapter.publicSignals(
         digest,
         OPERATION_AUTHORITY_COMMITMENT,
         attestationHash
       );
       const publicInputs = Array.from(rawPublicInputs);
-      await operationGeneratedVerifier.setExpectedPublicInputs(publicInputs);
+      await operationGeneratedVerifier.setExpectedPublicSignals(publicInputs);
       const proof = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["bytes32", "bytes32", "bytes", "bytes32[]"],
-        [OPERATION_AUTHORITY_COMMITMENT, attestationHash, "0x1234", publicInputs]
+        ["bytes32", "bytes32", "uint256[2]", "uint256[2][2]", "uint256[2]", "uint256[4]"],
+        [
+          OPERATION_AUTHORITY_COMMITMENT,
+          attestationHash,
+          [0, 0],
+          [
+            [0, 0],
+            [0, 0]
+          ],
+          [0, 0],
+          publicInputs
+        ]
       );
       return { nonce, proof, digest };
     }
 
     return { owner, other, notary, inputProof, operationProof };
   }
+
+  it("stores a single-chunk ciphertext without a separate manifest contract", async function () {
+    const harness: any = await ethers.deployContract("OnChainCiphertextHarness");
+    await harness.waitForDeployment();
+    const ciphertext = ethers.hexlify(ethers.randomBytes(1024));
+
+    await harness.store(ciphertext);
+
+    const storage = await harness.info();
+    expect(storage.ciphertextLength).to.equal(1024);
+    expect(storage.chunkCount).to.equal(1);
+    expect(storage.contentHash).to.equal(ethers.keccak256(ciphertext));
+    expect(await harness.load()).to.equal(ciphertext);
+
+    const runtimeCode = await ethers.provider.getCode(storage.manifest);
+    expect(runtimeCode).to.equal(`0x00${ciphertext.slice(2)}`);
+  });
+
+  it("keeps a compact address manifest for multi-chunk ciphertexts", async function () {
+    const harness: any = await ethers.deployContract("OnChainCiphertextHarness");
+    await harness.waitForDeployment();
+    const ciphertext = ethers.hexlify(new Uint8Array(24_576).fill(0x5a));
+
+    await harness.store(ciphertext, { gasLimit: 15_000_000 });
+
+    const storage = await harness.info();
+    expect(storage.ciphertextLength).to.equal(24_576);
+    expect(storage.chunkCount).to.equal(2);
+    expect(storage.contentHash).to.equal(ethers.keccak256(ciphertext));
+    expect(await harness.load()).to.equal(ciphertext);
+
+    const manifestCode = await ethers.provider.getCode(storage.manifest);
+    expect(ethers.getBytes(manifestCode).length).to.equal(41);
+  });
 
   it("stores only the latest energy entry for the benchmark surface", async function () {
     const { owner, notary, inputProof } = await fixture();
@@ -169,7 +238,6 @@ describe("EnergyDataNotaryOnChain", function () {
       .withArgs(1, owner.address, prepared.digest, prepared.metadataHash, prepared.minValue, prepared.maxValue);
 
     expect(await notary.isInputProofDigestConsumed(prepared.digest)).to.equal(true);
-    expect(await notary.getInputProofDigest(1)).to.equal(prepared.digest);
     expect(decU32(await notary.getLastEntryValue())).to.equal(42);
 
     await expect(
@@ -244,7 +312,6 @@ describe("EnergyDataNotaryOnChain", function () {
       .to.emit(notary, "EnergyOperationExecuted")
       .withArgs(owner.address, 6, 5, ethers.keccak256(meanOutput), 32);
     expect(decU32(await notary.getLastResult())).to.equal(47);
-    expect(await notary.getOperationProofDigest(3)).to.equal(meanProof.digest);
     expect(await notary.isOperationProofDigestConsumed(meanProof.digest)).to.equal(true);
 
     await expect(notary.meanLastEntryAndEncryptedTotalProof(meanOutput, meanProof.nonce, meanProof.proof))
@@ -337,10 +404,10 @@ describe("EnergyDataNotaryOnChain", function () {
   it("accepts a ZK operation-proof adapter for proof-backed results", async function () {
     const { owner, notary, inputProof } = await fixture();
 
-    const zkVerifier = await ethers.deployContract("MockNoirProofVerifier", [true]);
+    const zkVerifier = await ethers.deployContract("MockGroth16OperationVerifier", [true]);
     await zkVerifier.waitForDeployment();
     const authorityCommitment = ethers.toBeHex(123456789n, 32);
-    const operationAdapter = await ethers.deployContract("NoirOperationProofVerifierAdapter", [
+    const operationAdapter = await ethers.deployContract("Groth16OperationProofVerifierAdapter", [
       await zkVerifier.getAddress(),
       authorityCommitment,
     ]);
@@ -387,12 +454,22 @@ describe("EnergyDataNotaryOnChain", function () {
       nonce
     );
     const attestationHash = ethers.toBeHex(987654321n, 32);
-    const rawPublicInputs = await operationAdapter.publicInputs(digest, authorityCommitment, attestationHash);
+    const rawPublicInputs = await operationAdapter.publicSignals(digest, authorityCommitment, attestationHash);
     const publicInputs = Array.from(rawPublicInputs);
-    await zkVerifier.setExpectedPublicInputs(publicInputs);
+    await zkVerifier.setExpectedPublicSignals(publicInputs);
     const zkOperationProof = ethers.AbiCoder.defaultAbiCoder().encode(
-      ["bytes32", "bytes32", "bytes", "bytes32[]"],
-      [authorityCommitment, attestationHash, "0x1234", publicInputs]
+      ["bytes32", "bytes32", "uint256[2]", "uint256[2][2]", "uint256[2]", "uint256[4]"],
+      [
+        authorityCommitment,
+        attestationHash,
+        [0, 0],
+        [
+          [0, 0],
+          [0, 0]
+        ],
+        [0, 0],
+        publicInputs
+      ]
     );
 
     await expect(notary.meanLastEntryAndEncryptedTotalProof(meanOutput, nonce, zkOperationProof))

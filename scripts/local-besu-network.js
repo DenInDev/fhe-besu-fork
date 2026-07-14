@@ -4,9 +4,12 @@ const path = require("path");
 
 const ACTIONS = {
   configure: "besu/scripts/configure-network-genesis.sh",
+  "build-native": "native/scripts/build.sh",
+  build: "besu/scripts/build-fork.sh",
   start: "besu/scripts/start-besu-network.sh",
   stop: "besu/scripts/stop-besu-network.sh",
   reset: "besu/network/start-nodes.sh",
+  "smoke-precompile": "native/scripts/smoke_precompile_add.sh",
   status: "besu/network/start-nodes.sh",
 };
 

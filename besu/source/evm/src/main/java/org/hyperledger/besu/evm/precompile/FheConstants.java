@@ -21,6 +21,7 @@ public final class FheConstants {
       "0x00000000000000000000000000000000000000ff";
 
   public static final int VERSION = 1;
+  public static final int VERSION_STORED = 2;
 
   public static final int STATUS_OK = 0x00;
   public static final int STATUS_INVALID_ENCODING = 0x01;
@@ -49,6 +50,7 @@ public final class FheConstants {
   public static final int MAX_OPERAND_COUNT = 64;
   public static final int MAX_CIPHERTEXT_BYTES = 16 * 1024 * 1024;
   public static final int MAX_REQUEST_BYTES = 128 * 1024 * 1024;
+  public static final int STORED_REF_BYTES = 58;
 
   private FheConstants() {}
 }

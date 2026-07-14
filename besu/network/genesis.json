@@ -9,7 +9,7 @@
     "qbft": {
       "blockperiodseconds": 1,
       "epochlength": 30000,
-      "requesttimeoutseconds": 3
+      "requesttimeoutseconds": 60
     },
     "zeroBaseFee": true
   },

@@ -6,15 +6,22 @@ use std::fs;
 use std::sync::OnceLock;
 use tfhe::prelude::*;
 use tfhe::safe_serialization::{safe_deserialize, safe_serialize};
-use tfhe::{set_server_key, CompressedFheBool, CompressedFheUint32, FheBool, FheUint32, ServerKey};
+use tfhe::{
+    set_server_key, CompressedCiphertextList, CompressedCiphertextListBuilder, CompressedFheBool,
+    CompressedFheUint32, FheBool, FheUint32, ServerKey,
+};
 
 const SERVER_KEY_ENV: &str = "FHEBC_TFHE_SERVER_KEY_PATH";
 const ALLOW_NONDETERMINISTIC_PBS_ENV: &str = "FHEBC_ALLOW_NONDETERMINISTIC_PBS";
+const COMPRESSED_OUTPUTS_ENV: &str = "FHEBC_NATIVE_COMPRESSED_OUTPUTS";
+const PACKED_OUTPUTS_ENV: &str = "FHEBC_PACKED_OUTPUTS";
 const DEFAULT_SERVER_KEY_PATH: &str = "target/fhebc-keys/server.key";
 const MAX_KEY_BYTES: u64 = 1 << 30;
 const MAX_CIPHERTEXT_BYTES_U64: u64 = MAX_CIPHERTEXT_BYTES as u64;
 const COMPRESSED_U32_MAGIC: &[u8; 8] = b"FBCU32C1";
 const COMPRESSED_BOOL_MAGIC: &[u8; 8] = b"FBCBOLC1";
+const PACKED_U32_MAGIC: &[u8; 8] = b"FBCU32P1";
+const PACKED_BOOL_MAGIC: &[u8; 8] = b"FBCBOLP1";
 
 static SERVER_KEY: OnceLock<ServerKey> = OnceLock::new();
 
@@ -120,6 +127,18 @@ fn allow_nondeterministic_pbs() -> bool {
         .unwrap_or(false)
 }
 
+fn use_packed_outputs() -> bool {
+    std::env::var(PACKED_OUTPUTS_ENV)
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
+fn allow_compressed_outputs() -> bool {
+    std::env::var(COMPRESSED_OUTPUTS_ENV)
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
 fn ensure_server_key_is_set() -> Result<(), Status> {
     let key = server_key()?;
     set_server_key(key.clone());
@@ -174,6 +193,15 @@ fn force_deterministic_pbs(key: ServerKey) -> ServerKey {
 }
 
 fn deserialize_u32(input: &[u8]) -> Result<FheUint32, Status> {
+    if let Some(payload) = strip_magic(input, PACKED_U32_MAGIC) {
+        let compressed =
+            safe_deserialize::<CompressedCiphertextList>(payload, MAX_CIPHERTEXT_BYTES_U64)
+                .map_err(|_| Status::InvalidCiphertext)?;
+        return compressed
+            .get::<FheUint32>(0)
+            .map_err(|_| Status::InvalidCiphertext)?
+            .ok_or(Status::InvalidCiphertext);
+    }
     if let Some(payload) = strip_magic(input, COMPRESSED_U32_MAGIC) {
         let compressed = safe_deserialize::<CompressedFheUint32>(payload, MAX_CIPHERTEXT_BYTES_U64)
             .map_err(|_| Status::InvalidCiphertext)?;
@@ -184,6 +212,15 @@ fn deserialize_u32(input: &[u8]) -> Result<FheUint32, Status> {
 }
 
 fn deserialize_bool(input: &[u8]) -> Result<FheBool, Status> {
+    if let Some(payload) = strip_magic(input, PACKED_BOOL_MAGIC) {
+        let compressed =
+            safe_deserialize::<CompressedCiphertextList>(payload, MAX_CIPHERTEXT_BYTES_U64)
+                .map_err(|_| Status::InvalidCiphertext)?;
+        return compressed
+            .get::<FheBool>(0)
+            .map_err(|_| Status::InvalidCiphertext)?
+            .ok_or(Status::InvalidCiphertext);
+    }
     if let Some(payload) = strip_magic(input, COMPRESSED_BOOL_MAGIC) {
         let compressed = safe_deserialize::<CompressedFheBool>(payload, MAX_CIPHERTEXT_BYTES_U64)
             .map_err(|_| Status::InvalidCiphertext)?;
@@ -267,10 +304,8 @@ fn mean_u32(values: Vec<FheUint32>) -> Result<FheUint32, Status> {
     let result_raw = if divisor == 1 {
         acc_raw
     } else if divisor.is_power_of_two() {
-        integer_key.unchecked_scalar_right_shift_parallelized(
-            &acc_raw,
-            divisor.trailing_zeros() as u64,
-        )
+        integer_key
+            .unchecked_scalar_right_shift_parallelized(&acc_raw, divisor.trailing_zeros() as u64)
     } else {
         integer_key.unchecked_scalar_div_parallelized(&acc_raw, divisor as u64)
     };
@@ -302,7 +337,15 @@ fn sub_u32(lhs: FheUint32, rhs: FheUint32) -> Result<FheUint32, Status> {
 
 fn serialize_u32(ciphertext: FheUint32, compressed: bool) -> Result<Vec<u8>, Status> {
     let mut out = Vec::new();
-    if compressed {
+    if compressed && use_packed_outputs() {
+        let ciphertext = normalize_u32(ciphertext)?;
+        let mut builder = CompressedCiphertextListBuilder::new();
+        builder.push(ciphertext);
+        let compressed = builder.build().map_err(|_| Status::InternalError)?;
+        safe_serialize(&compressed, &mut out, MAX_CIPHERTEXT_BYTES_U64)
+            .map_err(|_| Status::InternalError)?;
+        Ok(wrap_magic(PACKED_U32_MAGIC, out))
+    } else if compressed {
         let compressed = ciphertext.compress();
         safe_serialize(&compressed, &mut out, MAX_CIPHERTEXT_BYTES_U64)
             .map_err(|_| Status::InternalError)?;
@@ -314,9 +357,24 @@ fn serialize_u32(ciphertext: FheUint32, compressed: bool) -> Result<Vec<u8>, Sta
     }
 }
 
+fn normalize_u32(ciphertext: FheUint32) -> Result<FheUint32, Status> {
+    let key = server_key()?.clone();
+    let (integer_key, _, _, _, _, _, _, _, _) = key.into_raw_parts();
+    let (mut raw, id, tag, metadata) = ciphertext.into_raw_parts();
+    integer_key.full_propagate(&mut raw);
+    Ok(FheUint32::from_raw_parts(raw, id, tag, metadata))
+}
+
 fn serialize_bool(ciphertext: FheBool, compressed: bool) -> Result<Vec<u8>, Status> {
     let mut out = Vec::new();
-    if compressed {
+    if compressed && use_packed_outputs() {
+        let mut builder = CompressedCiphertextListBuilder::new();
+        builder.push(ciphertext);
+        let compressed = builder.build().map_err(|_| Status::InternalError)?;
+        safe_serialize(&compressed, &mut out, MAX_CIPHERTEXT_BYTES_U64)
+            .map_err(|_| Status::InternalError)?;
+        Ok(wrap_magic(PACKED_BOOL_MAGIC, out))
+    } else if compressed {
         let compressed = ciphertext.compress();
         safe_serialize(&compressed, &mut out, MAX_CIPHERTEXT_BYTES_U64)
             .map_err(|_| Status::InternalError)?;
@@ -329,10 +387,18 @@ fn serialize_bool(ciphertext: FheBool, compressed: bool) -> Result<Vec<u8>, Stat
 }
 
 fn prefers_compressed_output(request: &Request) -> bool {
-    request.operands.iter().any(|operand| {
-        strip_magic(operand, COMPRESSED_U32_MAGIC).is_some()
-            || strip_magic(operand, COMPRESSED_BOOL_MAGIC).is_some()
-    })
+    // TFHE-rs ciphertext compression is not byte-deterministic across independent
+    // validator processes. The decrypted value is the same, but compressed bytes
+    // may differ, which breaks Besu consensus roots. Native precompile calls
+    // therefore return canonical raw ciphertext bytes unless explicitly enabled
+    // for off-consensus experiments.
+    allow_compressed_outputs()
+        && request.operands.iter().any(|operand| {
+            strip_magic(operand, COMPRESSED_U32_MAGIC).is_some()
+                || strip_magic(operand, COMPRESSED_BOOL_MAGIC).is_some()
+                || strip_magic(operand, PACKED_U32_MAGIC).is_some()
+                || strip_magic(operand, PACKED_BOOL_MAGIC).is_some()
+        })
 }
 
 fn strip_magic<'a>(input: &'a [u8], magic: &[u8; 8]) -> Option<&'a [u8]> {

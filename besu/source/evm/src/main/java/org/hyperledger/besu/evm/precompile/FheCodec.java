@@ -68,6 +68,16 @@ public final class FheCodec {
     return out.toByteArray();
   }
 
+  public static byte[] encodeOk(final int outputType, final int parameterSet, final byte[] payload) {
+    final ByteArrayOutputStream out = new ByteArrayOutputStream(8 + payload.length);
+    out.write(FheConstants.STATUS_OK);
+    out.write(outputType & 0xff);
+    writeU16(out, parameterSet);
+    writeU32(out, payload.length);
+    out.writeBytes(payload);
+    return out.toByteArray();
+  }
+
   private static void require(final byte[] input, final int offset, final int length) {
     if (offset < 0 || length < 0 || offset + length > input.length) {
       throw new FhePrecompileException(FheConstants.STATUS_INVALID_ENCODING);

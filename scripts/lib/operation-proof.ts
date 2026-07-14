@@ -69,7 +69,12 @@ export async function proveOperationProof(
   fs.mkdirSync(path.dirname(contextPath), { recursive: true });
   fs.writeFileSync(path.resolve(contextPath), JSON.stringify({ label: nonceSeed, operationDigest: digest }, null, 2));
 
-  const command = process.env.FHEBC_OPERATION_ZK_PROOF_COMMAND ?? "node scripts/proof/prove-operation-authority-noir.js";
+  const backend = (process.env.FHEBC_OPERATION_PROOF_BACKEND ?? "groth16").toLowerCase();
+  if (backend !== "groth16") {
+    throw new Error(`Unsupported operation proof backend: ${backend}. BesuFHE now uses Groth16.`);
+  }
+  const defaultCommand = "node scripts/proof/groth16/prove-operation-authority.js";
+  const command = process.env.FHEBC_OPERATION_ZK_PROOF_COMMAND ?? defaultCommand;
   const output = execSync(`${command} ${JSON.stringify(contextPath)}`, {
     cwd: projectPath(),
     encoding: "utf8",
@@ -94,7 +99,7 @@ export async function proveOperationProof(
   };
 }
 
-export async function ensureOperationProofVerifier(notary: any, txOverrides: TxOverrides) {
+export async function ensureOperationProofVerifier(notary: any, txOverrides: TxOverrides, signer?: any) {
   const configured = process.env.FHEBC_OPERATION_PROOF_VERIFIER_ADDRESS;
   const current = await notary.operationProofVerifier();
   if (current !== ethers.ZeroAddress && !configured) {
@@ -105,7 +110,11 @@ export async function ensureOperationProofVerifier(notary: any, txOverrides: TxO
     throw new Error("Notary operation proof configuration is frozen.");
   }
 
-  const verifierAddress = configured ?? await deployNoirOperationProofVerifier(txOverrides);
+  const backend = (process.env.FHEBC_OPERATION_PROOF_BACKEND ?? "groth16").toLowerCase();
+  if (backend !== "groth16") {
+    throw new Error(`Unsupported operation proof backend: ${backend}. BesuFHE now uses Groth16.`);
+  }
+  const verifierAddress = configured ?? await deployGroth16OperationProofVerifier(txOverrides, signer);
   await (await notary.setOperationProofVerifier(verifierAddress, txOverrides)).wait();
   if (process.env.FHEBC_FREEZE_OPERATION_PROOF_CONFIG !== "0") {
     await (await notary.freezeOperationProofConfiguration(txOverrides)).wait();
@@ -113,31 +122,26 @@ export async function ensureOperationProofVerifier(notary: any, txOverrides: TxO
   return verifierAddress;
 }
 
-async function deployNoirOperationProofVerifier(txOverrides: TxOverrides) {
+async function deployGroth16OperationProofVerifier(txOverrides: TxOverrides, signer?: any) {
   const commitment = process.env.FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT;
   if (!commitment || !ethers.isHexString(commitment, 32)) {
-    throw new Error("Set FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT to deploy the Noir operation proof verifier.");
+    throw new Error("Set FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT to deploy the Groth16 operation proof verifier.");
   }
 
-  let generatedVerifier = process.env.FHEBC_NOIR_OPERATION_VERIFIER_ADDRESS;
+  let generatedVerifier = process.env.FHEBC_GROTH16_OPERATION_VERIFIER_ADDRESS;
   if (!generatedVerifier) {
-    if (!(await artifacts.artifactExists("NoirOperationGeneratedVerifier"))) {
+    if (!(await artifacts.artifactExists("Groth16OperationGeneratedVerifier"))) {
       throw new Error(
-        "NoirOperationGeneratedVerifier missing. Run `npm run proof:build:operation-authority` and `npm run compile`, or set FHEBC_NOIR_OPERATION_VERIFIER_ADDRESS."
+        "Groth16OperationGeneratedVerifier missing. Run `npm run proof:build:operation-authority:groth16` and `npm run compile`, or set FHEBC_GROTH16_OPERATION_VERIFIER_ADDRESS."
       );
     }
-    const TranscriptLib = await ethers.getContractFactory("ZKTranscriptLib");
-    const transcriptLib = await TranscriptLib.deploy(txOverrides);
-    await transcriptLib.waitForDeployment();
-    const Verifier = await ethers.getContractFactory("NoirOperationGeneratedVerifier", {
-      libraries: { ZKTranscriptLib: await transcriptLib.getAddress() }
-    });
+    const Verifier = await ethers.getContractFactory("Groth16OperationGeneratedVerifier", signer);
     const verifier = await Verifier.deploy(txOverrides);
     await verifier.waitForDeployment();
     generatedVerifier = await verifier.getAddress();
   }
 
-  const Adapter = await ethers.getContractFactory("NoirOperationProofVerifierAdapter");
+  const Adapter = await ethers.getContractFactory("Groth16OperationProofVerifierAdapter", signer);
   const adapter = await Adapter.deploy(generatedVerifier, commitment, txOverrides);
   await adapter.waitForDeployment();
   if (process.env.FHEBC_FREEZE_OPERATION_PROOF_ADAPTER !== "0") {

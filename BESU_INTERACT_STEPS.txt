@@ -1,0 +1,59 @@
+cd ./besuFHE
+
+export PATH="$HOME/.cargo/bin:$PATH"
+
+command -v circom
+
+npm install
+
+npm run build:native
+
+npm run build:besu
+
+mkdir -p runtime/keys
+
+runtime/native/tfhe_tool keygen runtime/keys/client.key runtime/keys/server.key
+
+npm run proof:build:energy-input:groth16
+
+npm run proof:build:operation-authority:groth16
+
+mkdir -p runtime/secrets
+
+test -f runtime/secrets/operation-zk-secret || node -e "const {randomBytes}=require('crypto'); console.log(BigInt('0x'+randomBytes(31).toString('hex')).toString())" > runtime/secrets/operation-zk-secret
+
+chmod 600 runtime/secrets/operation-zk-secret
+
+export FHEBC_OPERATION_ZK_SECRET="$(cat runtime/secrets/operation-zk-secret)"
+
+mkdir -p runtime/proof-contexts
+
+printf '%s\n' '{"label":"commitment-bootstrap","operationDigest":"0x0000000000000000000000000000000000000000000000000000000000000001"}' > runtime/proof-contexts/commitment-bootstrap.json
+
+npm run proof:prove:operation-authority:groth16 -- runtime/proof-contexts/commitment-bootstrap.json
+
+REPORT="$(find proof/groth16/operation-authority/target/runs -name report.json -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
+
+export FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT="$(node -e "console.log(require('./' + process.argv[1]).authorityCommitment)" "$REPORT")"
+
+export FHEBC_INPUT_PROOF_BACKEND=groth16
+
+export FHEBC_OPERATION_PROOF_BACKEND=groth16
+
+export FHEBC_BENCHMARK_INPUT_PROOF_MODE=groth16
+
+export FHEBC_BENCHMARK_OPERATION_PROOF_MODE=groth16
+
+npm run compile
+
+npm run configure:besu
+
+npm run reset:besu
+
+npm run start:besu
+
+npm run status:besu
+
+npm run interact:besu
+
+npm run benchmark:besu

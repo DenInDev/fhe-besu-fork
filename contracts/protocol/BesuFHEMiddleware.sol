@@ -13,17 +13,17 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
 
     struct FheCiphertextRecord {
         address owner;
+        uint64 blockNumber;
         OnChainCiphertext.Blob ciphertext;
         bytes32 metadataHash;
-        uint256 blockNumber;
     }
 
     struct FheOperationRecord {
-        OperationKind kind;
         address owner;
+        uint64 blockNumber;
+        OperationKind kind;
         uint256 resultCiphertextId;
         bytes32 inputSetHash;
-        uint256 blockNumber;
     }
 
     error FheEmptyCiphertext();
@@ -31,10 +31,13 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
     error FheInvalidOperation(uint256 operationId);
     error FheNotOwner(address caller, address expected);
     error FheEmptyInputSet();
+    error FheBlockNumberOverflow(uint256 blockNumber);
+    error FheCounterOverflow();
 
-    uint256 private fheCiphertextCount;
-    uint256 private fheOperationCount;
+    uint128 private fheCiphertextCount;
+    uint128 private fheOperationCount;
 
+    mapping(bytes32 => OnChainCiphertext.Blob) private fheCiphertextBlobCache;
     mapping(uint256 => FheCiphertextRecord) private fheCiphertexts;
     mapping(uint256 => FheOperationRecord) private fheOperations;
 
@@ -124,12 +127,17 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
             revert FheEmptyCiphertext();
         }
 
-        ciphertextId = ++fheCiphertextCount;
+        if (fheCiphertextCount == type(uint128).max) {
+            revert FheCounterOverflow();
+        }
+        unchecked {
+            ciphertextId = ++fheCiphertextCount;
+        }
         FheCiphertextRecord storage record = fheCiphertexts[ciphertextId];
         record.owner = owner;
         record.metadataHash = metadataHash;
-        record.blockNumber = block.number;
-        record.ciphertext.write(ciphertext);
+        record.blockNumber = _currentBlockNumber();
+        record.ciphertext.writeDeduplicated(fheCiphertextBlobCache, ciphertext);
 
         emit FheCiphertextStored(
             ciphertextId,
@@ -138,6 +146,39 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
             metadataHash,
             ciphertext.length
         );
+    }
+
+    function _storeFheCiphertextReference(
+        address owner,
+        address manifest,
+        uint256 ciphertextLength,
+        uint256 chunkCount,
+        bytes32 contentHash,
+        bytes32 metadataHash
+    ) internal returns (uint256 ciphertextId) {
+        if (ciphertextLength == 0) {
+            revert FheEmptyCiphertext();
+        }
+
+        if (fheCiphertextCount == type(uint128).max) {
+            revert FheCounterOverflow();
+        }
+        unchecked {
+            ciphertextId = ++fheCiphertextCount;
+        }
+        FheCiphertextRecord storage record = fheCiphertexts[ciphertextId];
+        record.owner = owner;
+        record.metadataHash = metadataHash;
+        record.blockNumber = _currentBlockNumber();
+        record.ciphertext.writeReferenceDeduplicated(
+            fheCiphertextBlobCache,
+            manifest,
+            ciphertextLength,
+            chunkCount,
+            contentHash
+        );
+
+        emit FheCiphertextStored(ciphertextId, owner, contentHash, metadataHash, ciphertextLength);
     }
 
     function _storeFheOperation(OperationKind kind, address owner, bytes memory output, bytes32 inputSetHash)
@@ -157,13 +198,18 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
     {
         uint256 resultCiphertextId = _storeFheCiphertext(owner, output, resultMetadataHash);
 
-        operationId = ++fheOperationCount;
+        if (fheOperationCount == type(uint128).max) {
+            revert FheCounterOverflow();
+        }
+        unchecked {
+            operationId = ++fheOperationCount;
+        }
         FheOperationRecord storage operation = fheOperations[operationId];
         operation.kind = kind;
         operation.owner = owner;
         operation.resultCiphertextId = resultCiphertextId;
         operation.inputSetHash = inputSetHash;
-        operation.blockNumber = block.number;
+        operation.blockNumber = _currentBlockNumber();
 
         emit FheOperationStored(
             operationId,
@@ -173,6 +219,49 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
             inputSetHash,
             _fheCiphertextHash(resultCiphertextId),
             output.length
+        );
+    }
+
+    function _storeFheOperationReference(
+        OperationKind kind,
+        address owner,
+        address manifest,
+        uint256 ciphertextLength,
+        uint256 chunkCount,
+        bytes32 contentHash,
+        bytes32 inputSetHash,
+        bytes32 resultMetadataHash
+    ) internal returns (uint256 operationId) {
+        uint256 resultCiphertextId = _storeFheCiphertextReference(
+            owner,
+            manifest,
+            ciphertextLength,
+            chunkCount,
+            contentHash,
+            resultMetadataHash
+        );
+
+        if (fheOperationCount == type(uint128).max) {
+            revert FheCounterOverflow();
+        }
+        unchecked {
+            operationId = ++fheOperationCount;
+        }
+        FheOperationRecord storage operation = fheOperations[operationId];
+        operation.kind = kind;
+        operation.owner = owner;
+        operation.resultCiphertextId = resultCiphertextId;
+        operation.inputSetHash = inputSetHash;
+        operation.blockNumber = _currentBlockNumber();
+
+        emit FheOperationStored(
+            operationId,
+            kind,
+            owner,
+            resultCiphertextId,
+            inputSetHash,
+            contentHash,
+            ciphertextLength
         );
     }
 
@@ -293,5 +382,12 @@ abstract contract BesuFHEMiddleware is BesuFHEProtocol {
         if (operation.owner == address(0)) {
             revert FheInvalidOperation(operationId);
         }
+    }
+
+    function _currentBlockNumber() private view returns (uint64 value) {
+        if (block.number > type(uint64).max) {
+            revert FheBlockNumberOverflow(block.number);
+        }
+        return uint64(block.number);
     }
 }

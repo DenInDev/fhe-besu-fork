@@ -10,18 +10,19 @@ TFHE-rs, e mantiene i ciphertext completi nello stato on-chain.
 Il repository presenta come flusso di registrazione dei ciphertext:
 
 1. l'utente cifra localmente un valore energetico con `tfhe_tool`;
-2. viene prodotta una input validation proof ZK tramite Noir/Barretenberg;
+2. viene prodotta una input validation proof ZK tramite Groth16;
 3. `EnergyDataNotaryOnChain` verifica la proof tramite `IInputProofVerifier`;
 4. il ciphertext completo viene salvato on-chain tramite code storage;
 5. le operazioni FHE possono essere eseguite nativamente dalla precompile Besu
-   `0x100` oppure prodotte off-chain e accettate on-chain tramite operation
-   proof leggera;
+   `0x100` per chiamate `view`/diagnostiche, oppure prodotte off-chain e
+   accettate on-chain tramite operation proof leggera quando il risultato deve
+   essere salvato nello stato condiviso;
 6. nel flusso principale di benchmark, `add`, `mulScalar`, `mean` e `max`
    salvano risultati proof-backed come nuovi ciphertext on-chain;
 7. il possessore della client key recupera e decifra localmente gli output.
 
 Gli output ricreabili vengono generati sotto directory ignorate da Git
-(`artifacts/`, `cache/`, `typechain-types/`, `runtime/`, `proof/noir/**/target/`).
+(`artifacts/`, `cache/`, `typechain-types/`, `runtime/`, `proof/groth16/**/target/`).
 
 ## Struttura
 
@@ -29,9 +30,9 @@ Gli output ricreabili vengono generati sotto directory ignorate da Git
 besu/          Fork/wrapper Besu e rete QBFT locale autosufficiente.
 contracts/     Contratti Solidity, middleware BesuFHE e adapter input proof.
 native/        Backend Rust TFHE-rs, JNI e tool locale di cifratura/decifratura.
-proof/         Circuito Noir per la validazione ZK degli input energetici.
+proof/         Circuiti Groth16 per validazione input e operation proof.
 scripts/       Deploy, interazione e build delle proof.
-test/          Test Hardhat con mock della precompile e del verifier Noir.
+test/          Test Hardhat con mock della precompile e del verifier Groth16.
 runtime/       Solo output locali ricreati dagli script; non e' sorgente.
 ```
 
@@ -50,10 +51,10 @@ File principali:
 - `contracts/lib/FhePrecompile.sol`: ABI codec verso la precompile `0x100`;
 - `contracts/lib/OnChainCiphertext.sol`: salvataggio dei ciphertext in code
   chunks;
-- `contracts/proof/NoirEnergyInputVerifierAdapter.sol`: adapter tra il notary e
-  il verifier Solidity generato da Noir/Barretenberg;
-- `contracts/proof/NoirOperationProofVerifierAdapter.sol`: adapter ZK per le
-  operation proof del coprocessore;
+- `contracts/proof/Groth16EnergyInputVerifierAdapter.sol`: adapter tra il notary
+  e il verifier Solidity Groth16 BN254;
+- `contracts/proof/Groth16OperationProofVerifierAdapter.sol`: adapter
+  per operation proof Groth16 BN254;
 - `native/src/tfhe_backend.rs`: backend reale TFHE-rs;
 - `scripts/interact/energy-notary-benchmark.ts`: workflow end-to-end pulito.
 
@@ -62,7 +63,7 @@ File principali:
 - Node.js `20.x` e npm `10+`.
 - Rust/Cargo in WSL.
 - Java compatibile con la build Besu.
-- `nargo` e `bb` per produrre/verificare le proof Noir.
+- `circom` 2.x e `snarkjs` per produrre/verificare le proof Groth16.
 - Rete BesuFHE locale inclusa in `besu/network`.
 
 Installazione dipendenze Node:
@@ -106,7 +107,7 @@ npm run compile
 
 ## Proof ZK di input
 
-Il circuito Noir è intenzionalmente piccolo. Prova che:
+Il circuito Groth16 è intenzionalmente piccolo. Prova che:
 
 ```text
 plaintext in [minValue, maxValue]
@@ -116,35 +117,29 @@ metadataHash = Poseidon(plaintext, salt, owner, ciphertextHashHi, ciphertextHash
 Per garantire la confidenzialità, il contratto non vede il plaintext. 
 On-chain vengono verificati:
 
-- proof Barretenberg/Noir;
+- proof Groth16 BN254;
 - public input del circuito;
 - binding con `chainId`, indirizzo del notary, owner, hash del ciphertext,
   range, metadata hash e nonce.
 
-Build del circuito e del verifier Solidity generato:
+Build dei circuiti Groth16 e dei verifier Solidity generati:
 
 ```bash
 npm run proof:build:energy-input
+npm run proof:build:operation-authority
 npm run compile
 ```
 
-Deploy separato del verifier generato:
-
-```bash
-npm run deploy:besu:noir-input-verifier
-```
-
-Deploy dell'adapter, se il verifier generato e' gia' noto:
-
-```bash
-FHEBC_NOIR_INPUT_VERIFIER_ADDRESS=0x... npm run deploy:besu:input-adapter
-```
+Il verifier on-chain Groth16 usa il pairing precompile
+BN254 della EVM e un payload fisso `(a,b,c,publicSignals)`, quindi e'
+normalmente piu' leggero da verificare rispetto a verifier universali piu'
+pesanti.
 
 ## Operation ZK-Proof leggere
 
 La verifica completa della semantica TFHE dentro una prova ZK è possibile in
 linea teorica (vedere RISC-0, https://risczero.com/), ma troppo costosa per un setup scalabile. 
-Per questo il main case usa una operation proof ZK Noir leggera, legata al digest canonico
+Per questo il main case usa una operation proof ZK Groth16 leggera, legata al digest canonico
 dell'operazione:
 
 ```text
@@ -157,12 +152,12 @@ commitment pubblica autorizzata:
 
 ```text
 authorityCommitment = Poseidon(secret)
-attestationHash    = Poseidon(secret, digestHi, digestLo)
+attestationHash = Poseidon(secret, digestHi, digestLo)
 ```
 Questo passaggio, purtroppo, richiede che il segreto sia associato a un nodo o un'autorità trusted.
 In futuro, si esploreranno metodi più trasparenti e efficienti per la generazione di proof complete di computazione.
 
-Il contratto verifica la proof tramite `NoirOperationProofVerifierAdapter`, senza
+Il contratto verifica la proof tramite `Groth16OperationProofVerifierAdapter`, senza
 vedere il secret del coprocessore. Questa resta una prova ZK di autorizzazione e
 binding al digest, non una prova ZK completa della semantica TFHE. 
 Quindi:
@@ -179,24 +174,24 @@ Deploy del contratto sperimentale su Besu:
 npm run deploy:besu
 ```
 
-Lo script richiede un verifier ZK reale o lo genera dagli artifact Noir se sono
-presenti. Le opzioni principali sono:
+Lo script usa Groth16 come backend ZK principale. Opzione principale:
 
 ```bash
 FHEBC_INPUT_PROOF_VERIFIER_ADDRESS=0x... npm run deploy:besu
 ```
 
-oppure:
-
-```bash
-FHEBC_NOIR_INPUT_VERIFIER_ADDRESS=0x... npm run deploy:besu
-```
-
-Per le operation proof ZK Noir:
+Per le operation proof ZK Groth16:
 
 ```bash
 npm run proof:build:operation-authority
 npm run compile
+FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT=0x... \
+npm run deploy:besu
+```
+
+Deploy completo Groth16:
+
+```bash
 FHEBC_OPERATION_ZK_AUTHORITY_COMMITMENT=0x... \
 npm run deploy:besu
 ```
@@ -208,8 +203,25 @@ FHEBC_OPERATION_ZK_SECRET=12345 \
 npm run proof:prove:operation-authority -- runtime/proof-contexts/operation.json
 ```
 
-Lo script di benchmark usa automaticamente il prover Noir se
-`FHEBC_OPERATION_ZK_SECRET` e' configurato.
+Benchmark Groth16:
+
+```bash
+FHEBC_BENCHMARK_INPUT_PROOF_MODE=groth16 \
+FHEBC_BENCHMARK_OPERATION_PROOF_MODE=groth16 \
+FHEBC_OPERATION_ZK_SECRET=12345 \
+npm run benchmark:besu
+```
+
+Per provare direttamente il flusso proof-backed on-chain con verifier Groth16
+reale sulle operazioni:
+
+```bash
+npm run benchmark:besu:proof-backed-onchain -- 1
+```
+
+Il comando usa `FHEBC_OPERATION_ZK_SECRET=12345` se non viene fornito un secret
+diverso, calcola automaticamente la commitment Poseidon e imposta
+`FHEBC_BENCHMARK_ALL_PROOF_BACKED=1`.
 
 Il manifest viene scritto in:
 
@@ -253,7 +265,7 @@ Lo script:
 1. controlla che la precompile `0x100` risponda;
 2. genera le chiavi TFHE se non esistono;
 3. cifra un valore iniziale e una entry energetica;
-4. genera le input proof Noir;
+4. genera le input proof Groth16;
 5. deploya o aggancia il notary;
 6. chiama `initializeEncryptedTotal` e `addEnergyEntry`;
 7. produce off-chain i ciphertext risultato per `add`, `mulScalar`, `mean`,
@@ -272,7 +284,6 @@ FHEBC_ENTRY_VALUE=42
 FHEBC_SCALAR=3
 FHEBC_BESU_RPC_URL=http://localhost:8545
 FHEBC_BESU_CHAIN_ID=1337
-FHEBC_ZK_PROOF_COMMAND="node scripts/proof/prove-energy-input-noir.js"
 FHEBC_OPERATION_ZK_SECRET=12345
 ```
 
@@ -292,29 +303,69 @@ FHEBC_OPERATION_ZK_SECRET=12345
 - `multiplyLastEntryByConstant(uint64)`;
 - `multiplyLastEntryByConstantProof(uint64,bytes,bytes32,bytes)`;
 - `previewMeanLastEntryAndEncryptedTotal()`;
-- `meanLastEntryAndEncryptedTotal()`;
+- `meanLastEntryAndEncryptedTotal()` (nativa sperimentale);
 - `meanLastEntryAndEncryptedTotalProof(bytes,bytes32,bytes)`;
 - `previewMaxLastEntryAndEncryptedTotal()`;
-- `maxLastEntryAndEncryptedTotal()`;
+- `maxLastEntryAndEncryptedTotal()` (nativa sperimentale);
 - `maxLastEntryAndEncryptedTotalProof(bytes,bytes32,bytes)`.
 
 Le funzioni `preview*` sono `view`: misurano la latenza della computazione FHE
-senza aggiornare lo storage. Le versioni non-preview salvano il risultato
-cifrato on-chain. Nel flusso consigliato per benchmark e rete multi-validator si
-usano le versioni `*Proof`, cosi' i validatori verificano una attestazione
-leggera e non devono rieseguire operazioni FHE non lineari nella transazione.
+senza aggiornare lo storage. Il benchmark default e' consensus-safe e usa le
+versioni `*Proof` per tutte le transazioni che salvano ciphertext risultato. Le
+native lineari `add` e `mul_scalar` restano invocabili impostando
+`FHEBC_BENCHMARK_ALL_PROOF_BACKED=0`, ma questa modalita' e' sperimentale:
+salvare output TFHE compressi prodotti direttamente dai validator puo' creare
+byte diversi per lo stesso risultato cifrato e quindi non va usato come percorso
+QBFT principale.
 
 ## Storage Ciphertext
 
 I ciphertext vengono salvati interamente on-chain:
 1. il payload viene spezzato in chunk;
 2. ogni chunk viene deployato come bytecode immutabile;
-3. un manifest conserva ordine e indirizzi;
-4. il notary conserva manifest, lunghezza, numero di chunk e content hash;
-5. letture e precompile ricostruiscono i bytes con `EXTCODECOPY`.
+3. con un solo chunk il notary punta direttamente al data contract, senza
+   creare un manifest separato;
+4. con piu' chunk, un manifest conserva ordine e indirizzi;
+5. il notary conserva puntatore, lunghezza, numero di chunk e content hash;
+6. i record compattano owner, block number e tipo operazione nello stesso slot
+   quando possibile, mentre i due contatori globali condividono uno slot;
+7. letture e precompile ricostruiscono i bytes con `EXTCODECOPY`.
 
 Questa scelta rende la disponibilità del ciphertext una proprietà dello stato
 della chain, al prezzo di costi on-chain più alti (ma gestibili per una chain permissioned).
+
+Le ottimizzazioni riguardano soltanto layout e numero di scritture: non
+riducono il gas schedule della precompile e non spostano byte del ciphertext
+off-chain.
+
+### Output TFHE packed
+
+Il keyset generato dal tool include le chiavi TFHE di list compression. In
+pratica sono presenti tre casi:
+
+- gli input utente sono `CompressedFheUint32` generati fuori dalla chain e poi
+  inseriti in transazione;
+- le `view` native possono restituire output TFHE prodotti dalla precompile,
+  perche' non aggiornano state root o receipt;
+- il percorso proof-backed usa `CompressedCiphertextList` generato off-chain e
+  incluso interamente nella transazione, quindi tutti i validatori ricevono gli
+  stessi byte da salvare.
+
+La list compression non deve essere abilitata nel processo Besu tramite
+`FHEBC_NATIVE_COMPRESSED_OUTPUTS`/`FHEBC_PACKED_OUTPUTS`: in esecuzione
+concorrente tra validatori non garantisce un output byte-per-byte
+deterministico. Anche la compressione nativa di un risultato TFHE puo' produrre
+ciphertext equivalenti ma non identici nei byte. Per questo il percorso QBFT
+principale della precompile restituisce output raw/canonici, mentre i tool
+off-chain usati dal percorso proof-backed possono continuare a produrre
+`CompressedCiphertextList`, perche' in quel caso tutti i validatori ricevono
+gli stessi byte gia' calcolati nella transazione.
+
+La proof operation corrente dimostra la conoscenza del segreto associato
+all'authority commitment e lega digest, input set hash e output hash. Non
+dimostra internamente l'intera semantica TFHE dell'operazione: per questa
+garanzia forte va usato il percorso nativo, oppure un futuro circuito che
+includa la relazione TFHE.
 
 ## Verifica Locale
 
