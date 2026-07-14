@@ -32,8 +32,8 @@ contracts/     Contratti Solidity, middleware BesuFHE e adapter input proof.
 native/        Backend Rust TFHE-rs, JNI e tool locale di cifratura/decifratura.
 proof/         Circuiti Groth16 per validazione input e operation proof.
 scripts/       Deploy, interazione e build delle proof.
-test/          Test Hardhat con mock della precompile e del verifier Groth16.
-runtime/       Solo output locali ricreati dagli script; non e' sorgente.
+test/          Test Hardhat con mock della precompile e del verifier Noir.
+runtime/       Solo output locali ricreati dagli script; non è sorgente.
 ```
 
 File principali:
@@ -130,10 +130,17 @@ npm run proof:build:operation-authority
 npm run compile
 ```
 
-Il verifier on-chain Groth16 usa il pairing precompile
-BN254 della EVM e un payload fisso `(a,b,c,publicSignals)`, quindi e'
-normalmente piu' leggero da verificare rispetto a verifier universali piu'
-pesanti.
+Deploy separato del verifier generato:
+
+```bash
+npm run deploy:besu:noir-input-verifier
+```
+
+Deploy dell'adapter, se il verifier generato è già noto:
+
+```bash
+FHEBC_NOIR_INPUT_VERIFIER_ADDRESS=0x... npm run deploy:besu:input-adapter
+```
 
 ## Operation ZK-Proof leggere
 
@@ -159,12 +166,7 @@ In futuro, si esploreranno metodi più trasparenti e efficienti per la generazio
 
 Il contratto verifica la proof tramite `Groth16OperationProofVerifierAdapter`, senza
 vedere il secret del coprocessore. Questa resta una prova ZK di autorizzazione e
-binding al digest, non una prova ZK completa della semantica TFHE. 
-Quindi:
-- correttezza del binding, non-riuso e disponibilita' sono gestite on-chain;
-- l'autorizzazione di un'autorità può essere verificata in zero knowledge;
-- la correttezza matematica del calcolo TFHE dipende ancora dal coprocessore,
-  a meno di introdurre una proof molto piu' pesante della semantica TFHE.
+binding al digest.
 
 ## Deploy
 
@@ -203,25 +205,8 @@ FHEBC_OPERATION_ZK_SECRET=12345 \
 npm run proof:prove:operation-authority -- runtime/proof-contexts/operation.json
 ```
 
-Benchmark Groth16:
-
-```bash
-FHEBC_BENCHMARK_INPUT_PROOF_MODE=groth16 \
-FHEBC_BENCHMARK_OPERATION_PROOF_MODE=groth16 \
-FHEBC_OPERATION_ZK_SECRET=12345 \
-npm run benchmark:besu
-```
-
-Per provare direttamente il flusso proof-backed on-chain con verifier Groth16
-reale sulle operazioni:
-
-```bash
-npm run benchmark:besu:proof-backed-onchain -- 1
-```
-
-Il comando usa `FHEBC_OPERATION_ZK_SECRET=12345` se non viene fornito un secret
-diverso, calcola automaticamente la commitment Poseidon e imposta
-`FHEBC_BENCHMARK_ALL_PROOF_BACKED=1`.
+Lo script di benchmark usa automaticamente il prover Noir se
+`FHEBC_OPERATION_ZK_SECRET` è configurato.
 
 Il manifest viene scritto in:
 
@@ -308,15 +293,6 @@ FHEBC_OPERATION_ZK_SECRET=12345
 - `previewMaxLastEntryAndEncryptedTotal()`;
 - `maxLastEntryAndEncryptedTotal()` (nativa sperimentale);
 - `maxLastEntryAndEncryptedTotalProof(bytes,bytes32,bytes)`.
-
-Le funzioni `preview*` sono `view`: misurano la latenza della computazione FHE
-senza aggiornare lo storage. Il benchmark default e' consensus-safe e usa le
-versioni `*Proof` per tutte le transazioni che salvano ciphertext risultato. Le
-native lineari `add` e `mul_scalar` restano invocabili impostando
-`FHEBC_BENCHMARK_ALL_PROOF_BACKED=0`, ma questa modalita' e' sperimentale:
-salvare output TFHE compressi prodotti direttamente dai validator puo' creare
-byte diversi per lo stesso risultato cifrato e quindi non va usato come percorso
-QBFT principale.
 
 ## Storage Ciphertext
 
