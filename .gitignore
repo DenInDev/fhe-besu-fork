@@ -12,6 +12,7 @@ prover/target/
 runtime/besu/
 runtime/
 runtime/deployments/
+runtime/benchmarks/
 runtime/keys/
 runtime/native/
 runtime/runs/
